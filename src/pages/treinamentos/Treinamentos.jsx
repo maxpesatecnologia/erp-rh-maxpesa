@@ -1,3 +1,4 @@
+import { Bell } from "lucide-react";
 import SourceTag from "../../components/SourceTag";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
@@ -14,7 +15,8 @@ export default function Treinamentos() {
         <SourceTag path="SharePoint / RH / Treinamentos / Controle_Treinamentos_NRs.xlsx" />
       </div>
 
-      <div className="card">
+      <div className="card card-pad">
+        <div className="section-title">Treinamentos e certificações</div>
         <DataTable
           columns={[
             { key: "colaborador", label: "Colaborador" },
@@ -29,9 +31,12 @@ export default function Treinamentos() {
         />
       </div>
 
-      <div className="card card-pad" style={{ marginTop: 18, fontSize: 12.5, color: "var(--color-text-muted)" }}>
-        🔔 Alertas automáticos: colaboradores com treinamentos "Vencendo" ou "Vencido" são notificados
-        e sinalizados no módulo de Gestão de Equipes para bloqueio operacional.
+      <div className="card card-pad" style={{ marginTop: 18, fontSize: 12.5, color: "var(--color-text-muted)", display: "flex", alignItems: "flex-start", gap: 8 }}>
+        <Bell size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>
+          Alertas automáticos: colaboradores com treinamentos "Vencendo" ou "Vencido" são notificados
+          e sinalizados no módulo de Gestão de Equipes para bloqueio operacional.
+        </span>
       </div>
     </div>
   );

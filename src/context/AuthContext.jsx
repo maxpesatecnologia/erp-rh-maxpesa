@@ -41,6 +41,9 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
+  // Só entra quem tem uma linha em "profiles": é essa tabela que funciona como
+  // a lista de e-mails pré-liberados. Sem linha lá (usuário nunca provisionado
+  // pelo RH/admin), a sessão é encerrada na hora, mesmo com login/senha válidos.
   async function hydrateFromSupabase(authUser) {
     // Espera uma tabela "profiles" (id uuid FK -> auth.users.id) com as
     // colunas: nome, role, filial. Ver README para o schema + RLS.
@@ -50,24 +53,30 @@ export function AuthProvider({ children }) {
       .eq("id", authUser.id)
       .single();
 
-    if (error) {
-      console.warn("Não foi possível carregar o perfil do usuário:", error.message);
+    if (error || !profile) {
+      await supabase.auth.signOut();
+      setUser(null);
+      return false;
     }
 
     setUser({
       id: authUser.id,
       email: authUser.email,
-      nome: profile?.nome ?? authUser.email,
-      role: profile?.role ?? "colaborador",
-      filial: profile?.filial ?? "—",
+      nome: profile.nome,
+      role: profile.role,
+      filial: profile.filial ?? "—",
     });
+    return true;
   }
 
   async function signIn(email, password) {
     if (isSupabaseConfigured) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message);
-      await hydrateFromSupabase(data.user);
+      const authorized = await hydrateFromSupabase(data.user);
+      if (!authorized) {
+        throw new Error("Este e-mail ainda não foi liberado para acessar o sistema. Fale com o RH ou administrador.");
+      }
       return;
     }
 

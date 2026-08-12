@@ -14,7 +14,8 @@ export default function MedicinaOcupacional() {
         <SourceTag path="SharePoint / SESMT / Medicina_Ocupacional / Controle_ASO.xlsx" />
       </div>
 
-      <div className="card" style={{ marginBottom: 18 }}>
+      <div className="card card-pad" style={{ marginBottom: 18 }}>
+        <div className="section-title">Exames ASO</div>
         <DataTable
           columns={[
             { key: "colaborador", label: "Colaborador" },

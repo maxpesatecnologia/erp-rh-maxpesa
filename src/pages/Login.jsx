@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { DEMO_USERS } from "../data/demoUsers";
 
 export default function Login() {
   const { signIn, isSupabaseConfigured } = useAuth();
+  const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -36,7 +38,11 @@ export default function Login() {
     <div className="login-screen">
       <div className="login-card">
         <div className="login-brand">
-          <div className="login-brand-mark">MP</div>
+          <img
+            className="login-brand-mark"
+            src={theme === "dark" ? "/logo_branca.png" : "/maxpesa_logo_png.png"}
+            alt="Grupo Maxpesa"
+          />
           <h1>Maxpesa | ERP RH</h1>
           <p>Plataforma de Gestão Estratégica de Pessoas</p>
         </div>

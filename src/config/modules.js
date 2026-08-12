@@ -1,6 +1,21 @@
 // Mapa central de módulos do Maxpesa | ERP RH.
 // Cada módulo define quais perfis (roles) podem acessá-lo.
 // Perfis: admin | rh | gestor | colaborador
+import {
+  LayoutDashboard,
+  Users,
+  IdCard,
+  Target,
+  FileText,
+  GraduationCap,
+  Truck,
+  ShieldCheck,
+  Stethoscope,
+  HardHat,
+  Users2,
+  Megaphone,
+  Bot,
+} from "lucide-react";
 
 export const ROLE_LABELS = {
   admin: "Administrador",
@@ -16,7 +31,7 @@ export const NAV_SECTIONS = [
       {
         path: "/",
         label: "Dashboard Executivo",
-        icon: "📊",
+        icon: LayoutDashboard,
         roles: ["admin", "rh", "gestor"],
       },
     ],
@@ -27,31 +42,31 @@ export const NAV_SECTIONS = [
       {
         path: "/colaboradores",
         label: "Cadastro de Colaboradores",
-        icon: "🧑‍💼",
+        icon: Users,
         roles: ["admin", "rh", "gestor"],
       },
       {
         path: "/portal",
         label: "Portal do Colaborador",
-        icon: "🪪",
+        icon: IdCard,
         roles: ["admin", "rh", "gestor", "colaborador"],
       },
       {
         path: "/recrutamento",
         label: "Recrutamento & Seleção",
-        icon: "🎯",
+        icon: Target,
         roles: ["admin", "rh"],
       },
       {
         path: "/admissao",
         label: "Admissão Digital",
-        icon: "📝",
+        icon: FileText,
         roles: ["admin", "rh"],
       },
       {
         path: "/treinamentos",
         label: "Treinamentos",
-        icon: "🎓",
+        icon: GraduationCap,
         roles: ["admin", "rh", "gestor", "colaborador"],
       },
     ],
@@ -62,31 +77,31 @@ export const NAV_SECTIONS = [
       {
         path: "/operadores",
         label: "Operadores de Equipamentos",
-        icon: "🏗️",
+        icon: Truck,
         roles: ["admin", "rh", "gestor"],
       },
       {
         path: "/seguranca",
         label: "Segurança do Trabalho",
-        icon: "🦺",
+        icon: ShieldCheck,
         roles: ["admin", "rh", "gestor"],
       },
       {
         path: "/medicina",
         label: "Medicina Ocupacional",
-        icon: "🩺",
+        icon: Stethoscope,
         roles: ["admin", "rh", "gestor"],
       },
       {
         path: "/epis",
         label: "Gestão de EPIs",
-        icon: "🧰",
+        icon: HardHat,
         roles: ["admin", "rh", "gestor"],
       },
       {
         path: "/equipes",
         label: "Gestão de Equipes",
-        icon: "👷",
+        icon: Users2,
         roles: ["admin", "rh", "gestor"],
       },
     ],
@@ -97,13 +112,13 @@ export const NAV_SECTIONS = [
       {
         path: "/comunicacao",
         label: "Comunicação Interna",
-        icon: "📣",
+        icon: Megaphone,
         roles: ["admin", "rh", "gestor", "colaborador"],
       },
       {
         path: "/ia",
         label: "IA Corporativa",
-        icon: "🤖",
+        icon: Bot,
         roles: ["admin", "rh", "gestor", "colaborador"],
       },
     ],

@@ -1,3 +1,4 @@
+import { CheckCircle2, XCircle } from "lucide-react";
 import SourceTag from "../../components/SourceTag";
 import { CONTRATOS } from "../../data/mock/equipes";
 
@@ -51,7 +52,9 @@ export default function GestaoEquipes() {
                     <td>{m.nome}</td>
                     <td>{m.funcao}</td>
                     {Object.keys(REQ_LABELS).map((key) => (
-                      <td key={key}>{m.requisitos[key] ? "✅" : "❌"}</td>
+                      <td key={key} style={{ color: m.requisitos[key] ? "var(--color-success)" : "var(--color-danger)" }}>
+                        {m.requisitos[key] ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                      </td>
                     ))}
                     <td>
                       <span className={`badge ${m.bloqueado ? "badge-danger" : "badge-success"}`}>

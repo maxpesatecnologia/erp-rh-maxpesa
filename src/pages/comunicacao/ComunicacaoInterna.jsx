@@ -1,3 +1,4 @@
+import { Cake, BarChart3 } from "lucide-react";
 import SourceTag from "../../components/SourceTag";
 import { COMUNICADOS, ANIVERSARIANTES, ENQUETES } from "../../data/mock/comunicacao";
 
@@ -26,7 +27,9 @@ export default function ComunicacaoInterna() {
 
         <div>
           <div className="card card-pad" style={{ marginBottom: 18 }}>
-            <div className="section-title">🎂 Aniversariantes</div>
+            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Cake size={16} /> Aniversariantes
+            </div>
             {ANIVERSARIANTES.map((a) => (
               <div key={a.nome} style={{ fontSize: 13, padding: "6px 0" }}>
                 {a.nome} — {a.data}
@@ -35,7 +38,9 @@ export default function ComunicacaoInterna() {
           </div>
 
           <div className="card card-pad">
-            <div className="section-title">📊 Enquete ativa</div>
+            <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <BarChart3 size={16} /> Enquete ativa
+            </div>
             {ENQUETES.map((enq) => {
               const total = enq.opcoes.reduce((sum, o) => sum + o.votos, 0);
               return (
@@ -49,7 +54,7 @@ export default function ComunicacaoInterna() {
                           <span>{op.texto}</span>
                           <span>{pct}%</span>
                         </div>
-                        <div style={{ background: "#eef1f4", borderRadius: 6, height: 8, marginTop: 4 }}>
+                        <div style={{ background: "var(--color-border)", borderRadius: 6, height: 8, marginTop: 4 }}>
                           <div style={{ background: "var(--color-accent)", width: `${pct}%`, height: 8, borderRadius: 6 }} />
                         </div>
                       </div>

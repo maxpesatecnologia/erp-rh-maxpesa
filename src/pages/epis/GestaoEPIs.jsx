@@ -14,31 +14,30 @@ export default function GestaoEPIs() {
         <SourceTag path="SharePoint / SESMT / EPIs / Estoque_e_Entregas.xlsx" />
       </div>
 
-      <div className="grid grid-2">
-        <div className="card card-pad">
-          <div className="section-title">Estoque</div>
-          <DataTable
-            columns={[
-              { key: "item", label: "Item" },
-              { key: "estoqueAtual", label: "Estoque atual" },
-              { key: "estoqueMinimo", label: "Estoque mínimo" },
-              { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status === "OK" ? "Válido" : r.status === "Baixo" ? "Vencendo" : "Vencido"} /> },
-            ]}
-            rows={ESTOQUE_EPI}
-          />
-        </div>
-        <div className="card card-pad">
-          <div className="section-title">Entregas / assinaturas digitais</div>
-          <DataTable
-            columns={[
-              { key: "colaborador", label: "Colaborador" },
-              { key: "item", label: "Item" },
-              { key: "validade", label: "Validade" },
-              { key: "assinatura", label: "Assinatura", render: (r) => <StatusBadge status={r.assinatura === "Assinado" ? "Válido" : "Pendente"} /> },
-            ]}
-            rows={ENTREGAS_EPI}
-          />
-        </div>
+      <div className="card card-pad" style={{ marginBottom: 18 }}>
+        <div className="section-title">Estoque</div>
+        <DataTable
+          columns={[
+            { key: "item", label: "Item" },
+            { key: "estoqueAtual", label: "Estoque atual" },
+            { key: "estoqueMinimo", label: "Estoque mínimo" },
+            { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status === "OK" ? "Válido" : r.status === "Baixo" ? "Vencendo" : "Vencido"} /> },
+          ]}
+          rows={ESTOQUE_EPI}
+        />
+      </div>
+
+      <div className="card card-pad">
+        <div className="section-title">Entregas / assinaturas digitais</div>
+        <DataTable
+          columns={[
+            { key: "colaborador", label: "Colaborador" },
+            { key: "item", label: "Item" },
+            { key: "validade", label: "Validade" },
+            { key: "assinatura", label: "Assinatura", render: (r) => <StatusBadge status={r.assinatura === "Assinado" ? "Válido" : "Pendente"} /> },
+          ]}
+          rows={ENTREGAS_EPI}
+        />
       </div>
     </div>
   );

@@ -70,14 +70,25 @@ vai garantir a segurança e a trava de acesso reais.
      );
    ```
 
-5. Crie os usuários em **Authentication → Users** (ou via app, se habilitar signup) e depois insira a linha
-   correspondente em `profiles` com o `role` de cada um.
+5. Crie os usuários em **Authentication → Users** (o app não tem tela de cadastro público) e depois insira a
+   linha correspondente em `profiles` com o `role` de cada um. É essa linha em `profiles` que libera o acesso:
+   sem ela, o login é recusado mesmo com e-mail/senha corretos (ver item abaixo).
 6. Reinicie `npm run dev`. O app detecta o `.env` preenchido e passa a usar o Supabase de verdade — o modo demo
    é desativado automaticamente.
 
 O front-end já está todo preparado para isso: veja `src/lib/supabaseClient.js` e `src/context/AuthContext.jsx`.
 Cada módulo do menu (`src/config/modules.js`) já declara quais `roles` podem acessá-lo — é só ajustar essa lista
 conforme a política de acesso definitiva da Maxpesa.
+
+### Login restrito a e-mails pré-liberados
+
+Não existe formulário de cadastro no app — só a tela de login. O controle de quem pode entrar funciona assim:
+
+- **Modo demo:** só os 4 e-mails listados em `src/data/demoUsers.js` funcionam.
+- **Modo Supabase:** o login exige uma conta em **Authentication → Users** *e* uma linha correspondente em
+  `profiles`. Se alguém autenticar mas não tiver linha em `profiles` (ou seja, nunca foi provisionado pelo
+  RH/administrador), o app encerra a sessão automaticamente e mostra "Este e-mail ainda não foi liberado para
+  acessar o sistema." — mesmo que a senha esteja correta. Ou seja, `profiles` é a lista de e-mails autorizados.
 
 ## Sobre os dados das telas (hoje mockados, no formato do SharePoint)
 

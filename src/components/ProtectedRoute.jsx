@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
+import { Lock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { canAccess } from "../config/modules";
 import Layout from "./Layout";
@@ -23,7 +24,7 @@ export default function ProtectedRoute({ children }) {
         children
       ) : (
         <div className="access-denied">
-          <div className="icon-lock">🔒</div>
+          <div className="icon-lock"><Lock size={32} /></div>
           <h2>Acesso restrito</h2>
           <p>
             Seu perfil ("{user.role}") não tem permissão para acessar este módulo.
