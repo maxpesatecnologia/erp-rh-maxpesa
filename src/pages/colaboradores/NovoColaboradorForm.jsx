@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { Camera, X } from "lucide-react";
 
 const CAMPOS_OBRIGATORIOS = ["nome", "cargo", "departamento", "filial", "gestor", "admissao"];
 
 const ESTADO_INICIAL = {
   nome: "",
+  codigoDominio: "",
+  foto: null,
   cargo: "",
   departamento: "",
   filial: "",
@@ -25,6 +28,14 @@ export default function NovoColaboradorForm({ onCriar, onCancelar }) {
 
   function atualizar(campo, valor) {
     setDados((atual) => ({ ...atual, [campo]: valor }));
+  }
+
+  function handleFoto(e) {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    const leitor = new FileReader();
+    leitor.onload = () => atualizar("foto", leitor.result);
+    leitor.readAsDataURL(arquivo);
   }
 
   function handleSubmit(e) {
@@ -49,10 +60,34 @@ export default function NovoColaboradorForm({ onCriar, onCancelar }) {
       {erro && <div className="login-error" style={{ marginBottom: 14 }}>{erro}</div>}
 
       <form onSubmit={handleSubmit}>
+        <div className="photo-upload">
+          <label className={`photo-dropzone ${dados.foto ? "has-photo" : ""}`} title="Anexar foto do colaborador">
+            {dados.foto ? <img src={dados.foto} alt="Prévia da foto" /> : <Camera size={22} />}
+            <input type="file" accept="image/*" onChange={handleFoto} aria-label="Anexar foto do colaborador" />
+          </label>
+          <div className="photo-upload-hint">
+            Foto do colaborador (opcional).
+            {dados.foto && (
+              <button type="button" onClick={() => atualizar("foto", null)} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <X size={12} /> Remover foto
+              </button>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-3" style={{ gap: 12, marginBottom: 12 }}>
           <div className="field-group">
             <label htmlFor="nome">Nome *</label>
             <input id="nome" value={dados.nome} onChange={(e) => atualizar("nome", e.target.value)} required />
+          </div>
+          <div className="field-group">
+            <label htmlFor="codigoDominio">Código (Domínio Sistemas)</label>
+            <input
+              id="codigoDominio"
+              value={dados.codigoDominio}
+              onChange={(e) => atualizar("codigoDominio", e.target.value)}
+              placeholder="ex: DOM-10234"
+            />
           </div>
           <div className="field-group">
             <label htmlFor="cargo">Cargo *</label>

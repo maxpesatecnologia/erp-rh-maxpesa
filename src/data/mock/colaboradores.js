@@ -5,6 +5,7 @@
 export const COLABORADORES = [
   {
     id: "C-1001",
+    codigoDominio: "DOM-10001",
     nome: "João Pereira",
     cargo: "Operador de Guindaste",
     departamento: "Operações",
@@ -22,6 +23,7 @@ export const COLABORADORES = [
   },
   {
     id: "C-1002",
+    codigoDominio: "DOM-10002",
     nome: "Marcos Vinícius Souza",
     cargo: "Rigger",
     departamento: "Operações",
@@ -39,6 +41,7 @@ export const COLABORADORES = [
   },
   {
     id: "C-1003",
+    codigoDominio: "DOM-10003",
     nome: "Ana Ribeiro",
     cargo: "Analista de RH Sênior",
     departamento: "Recursos Humanos",
@@ -56,6 +59,7 @@ export const COLABORADORES = [
   },
   {
     id: "C-1004",
+    codigoDominio: "DOM-10004",
     nome: "Rafael Souto",
     cargo: "Sinaleiro",
     departamento: "Operações",
@@ -73,6 +77,7 @@ export const COLABORADORES = [
   },
   {
     id: "C-1005",
+    codigoDominio: "DOM-10005",
     nome: "Patrícia Lima",
     cargo: "Técnica de Segurança do Trabalho",
     departamento: "Segurança do Trabalho",
@@ -90,6 +95,7 @@ export const COLABORADORES = [
   },
   {
     id: "C-1006",
+    codigoDominio: "DOM-10006",
     nome: "Eduardo Farias",
     cargo: "Motorista",
     departamento: "Operações",

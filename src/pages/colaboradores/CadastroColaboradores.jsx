@@ -3,6 +3,7 @@ import { Plus, X } from "lucide-react";
 import SourceTag from "../../components/SourceTag";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
+import Avatar from "../../components/Avatar";
 import NovoColaboradorForm from "./NovoColaboradorForm";
 import { COLABORADORES } from "../../data/mock/colaboradores";
 
@@ -80,7 +81,17 @@ export default function CadastroColaboradores() {
         <DataTable
           columns={[
             { key: "id", label: "Matrícula" },
-            { key: "nome", label: "Nome" },
+            {
+              key: "nome",
+              label: "Nome",
+              render: (r) => (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Avatar nome={r.nome} foto={r.foto} size={28} />
+                  <span>{r.nome}</span>
+                </div>
+              ),
+            },
+            { key: "codigoDominio", label: "Código Domínio", render: (r) => r.codigoDominio || "—" },
             { key: "cargo", label: "Cargo" },
             { key: "filial", label: "Filial" },
             { key: "gestor", label: "Gestor" },
@@ -104,8 +115,11 @@ export default function CadastroColaboradores() {
           {selected && (
             <div className="card card-pad collapse-content" style={{ marginTop: 20 }} key={selected.id}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <div className="section-title" style={{ marginBottom: 0 }}>
-                  Timeline completa — {selected.nome} ({selected.id})
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <Avatar nome={selected.nome} foto={selected.foto} size={44} />
+                  <div className="section-title" style={{ marginBottom: 0 }}>
+                    Timeline completa — {selected.nome} ({selected.id})
+                  </div>
                 </div>
                 <button
                   className="icon-btn"
@@ -115,7 +129,7 @@ export default function CadastroColaboradores() {
                   <X size={16} />
                 </button>
               </div>
-              <div className="grid grid-3" style={{ marginBottom: 18 }}>
+              <div className="grid grid-4" style={{ marginBottom: 18 }}>
                 <div>
                   <div className="kpi-label">Departamento / Centro de custo</div>
                   <div style={{ fontSize: 13, marginTop: 4 }}>{selected.departamento} · {selected.centroCusto}</div>
@@ -127,6 +141,10 @@ export default function CadastroColaboradores() {
                 <div>
                   <div className="kpi-label">Escolaridade / Dependentes</div>
                   <div style={{ fontSize: 13, marginTop: 4 }}>{selected.escolaridade} · {selected.dependentes} dependente(s)</div>
+                </div>
+                <div>
+                  <div className="kpi-label">Código Domínio</div>
+                  <div style={{ fontSize: 13, marginTop: 4 }}>{selected.codigoDominio || "—"}</div>
                 </div>
               </div>
 

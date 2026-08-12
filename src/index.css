@@ -808,6 +808,86 @@ table.data-table tbody tr:hover {
   border-color: var(--color-accent);
 }
 
+/* ---------- Avatar ---------- */
+
+.avatar-img,
+.avatar-fallback {
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.avatar-fallback {
+  background: var(--color-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+/* ---------- Photo dropzone (upload de foto) ---------- */
+
+.photo-upload {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.photo-dropzone {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 2px dashed var(--color-border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+  transition: border-color var(--dur-base) var(--ease-premium), color var(--dur-base) var(--ease-premium);
+}
+
+.photo-dropzone:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.photo-dropzone.has-photo {
+  border-style: solid;
+}
+
+.photo-dropzone img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-dropzone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.photo-upload-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.photo-upload-hint button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
 .field-static {
   padding: 10px 12px;
   border-radius: var(--radius-sm);
