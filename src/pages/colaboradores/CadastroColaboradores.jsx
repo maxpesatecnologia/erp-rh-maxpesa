@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, Upload, X } from "lucide-react";
 import SourceTag from "../../components/SourceTag";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import Avatar from "../../components/Avatar";
 import NovoColaboradorForm from "./NovoColaboradorForm";
+import ImportarColaboradoresForm from "./ImportarColaboradoresForm";
 import { COLABORADORES } from "../../data/mock/colaboradores";
 
 function proximaMatricula(lista) {
@@ -15,12 +16,28 @@ function proximaMatricula(lista) {
   return `C-${maiorNumero + 1}`;
 }
 
+// Transforma os dados brutos de um formulário (manual ou importado) no objeto
+// final de colaborador — reaproveitado tanto pelo cadastro único quanto pela
+// importação em massa.
+function criarColaborador(novo, id) {
+  return {
+    ...novo,
+    id,
+    status: "Ativo",
+    cnh: novo.cnhCategoria ? { categoria: novo.cnhCategoria, validade: novo.cnhValidade } : null,
+    nrs: novo.nrs ? novo.nrs.split(",").map((s) => s.trim()).filter(Boolean) : [],
+    certificacoes: novo.certificacoes ? novo.certificacoes.split(",").map((s) => s.trim()).filter(Boolean) : [],
+  };
+}
+
 export default function CadastroColaboradores() {
   const [colaboradores, setColaboradores] = useState(COLABORADORES);
   const [selected, setSelected] = useState(null);
   const [timelineAberta, setTimelineAberta] = useState(false);
   const [formAberto, setFormAberto] = useState(false);
   const [formVisitado, setFormVisitado] = useState(false);
+  const [importAberto, setImportAberto] = useState(false);
+  const [importVisitado, setImportVisitado] = useState(false);
 
   function handleVerTimeline(colaborador) {
     if (selected?.id === colaborador.id && timelineAberta) {
@@ -32,16 +49,22 @@ export default function CadastroColaboradores() {
   }
 
   function handleCriar(novo) {
-    const colaborador = {
-      ...novo,
-      id: proximaMatricula(colaboradores),
-      status: "Ativo",
-      cnh: novo.cnhCategoria ? { categoria: novo.cnhCategoria, validade: novo.cnhValidade } : null,
-      nrs: novo.nrs ? novo.nrs.split(",").map((s) => s.trim()).filter(Boolean) : [],
-      certificacoes: novo.certificacoes ? novo.certificacoes.split(",").map((s) => s.trim()).filter(Boolean) : [],
-    };
+    const colaborador = criarColaborador(novo, proximaMatricula(colaboradores));
     setColaboradores((atual) => [colaborador, ...atual]);
     setFormAberto(false);
+  }
+
+  function handleImportarEmMassa(linhas) {
+    setColaboradores((atual) => {
+      let proximoNumero = Number(proximaMatricula(atual).replace(/\D/g, ""));
+      const novos = linhas.map((dados) => {
+        const colaborador = criarColaborador(dados, `C-${proximoNumero}`);
+        proximoNumero += 1;
+        return colaborador;
+      });
+      return [...novos, ...atual];
+    });
+    setImportAberto(false);
   }
 
   return (
@@ -54,6 +77,16 @@ export default function CadastroColaboradores() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <SourceTag path="SharePoint / RH / Colaboradores / Cadastro_Colaboradores.xlsx" />
           <button
+            className="btn btn-outline"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={() => {
+              setImportVisitado(true);
+              setImportAberto((v) => !v);
+            }}
+          >
+            <Upload size={16} /> Importar colaboradores
+          </button>
+          <button
             className="btn btn-primary"
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             onClick={() => {
@@ -63,6 +96,16 @@ export default function CadastroColaboradores() {
           >
             <Plus size={16} /> Novo colaborador
           </button>
+        </div>
+      </div>
+
+      <div className={`collapse ${importAberto ? "open" : ""}`}>
+        <div className="collapse-inner">
+          {importVisitado && (
+            <div className="collapse-content">
+              <ImportarColaboradoresForm onCancelar={() => setImportAberto(false)} onImportar={handleImportarEmMassa} />
+            </div>
+          )}
         </div>
       </div>
 

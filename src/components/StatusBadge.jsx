@@ -4,6 +4,8 @@ const MAP = {
   ativo: "success",
   aprovado: "success",
   em_dia: "success",
+  concluido: "success",
+  concluído: "success",
 
   vencendo: "warning",
   pendente: "warning",
@@ -14,6 +16,8 @@ const MAP = {
   bloqueado: "danger",
   reprovado: "danger",
   inapto: "danger",
+  atrasado: "danger",
+  erro: "danger",
 
   informativo: "info",
   novo: "info",

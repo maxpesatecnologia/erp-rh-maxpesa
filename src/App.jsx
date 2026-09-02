@@ -9,7 +9,9 @@ import CadastroColaboradores from "./pages/colaboradores/CadastroColaboradores";
 import PortalColaborador from "./pages/portal/PortalColaborador";
 import Recrutamento from "./pages/recrutamento/Recrutamento";
 import AdmissaoDigital from "./pages/admissao/AdmissaoDigital";
+import DesligamentoDigital from "./pages/desligamento/DesligamentoDigital";
 import Treinamentos from "./pages/treinamentos/Treinamentos";
+import AvaliacaoDesempenho from "./pages/avaliacao/AvaliacaoDesempenho";
 import OperadoresEquipamentos from "./pages/operadores/OperadoresEquipamentos";
 import SegurancaTrabalho from "./pages/seguranca/SegurancaTrabalho";
 import MedicinaOcupacional from "./pages/medicina/MedicinaOcupacional";
@@ -35,7 +37,9 @@ export default function App() {
           <Route path="/portal" element={withLayout(<PortalColaborador />)} />
           <Route path="/recrutamento" element={withLayout(<Recrutamento />)} />
           <Route path="/admissao" element={withLayout(<AdmissaoDigital />)} />
+          <Route path="/desligamento" element={withLayout(<DesligamentoDigital />)} />
           <Route path="/treinamentos" element={withLayout(<Treinamentos />)} />
+          <Route path="/avaliacao-desempenho" element={withLayout(<AvaliacaoDesempenho />)} />
           <Route path="/operadores" element={withLayout(<OperadoresEquipamentos />)} />
           <Route path="/seguranca" element={withLayout(<SegurancaTrabalho />)} />
           <Route path="/medicina" element={withLayout(<MedicinaOcupacional />)} />

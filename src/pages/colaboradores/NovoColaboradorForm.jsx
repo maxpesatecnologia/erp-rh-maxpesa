@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Camera, X } from "lucide-react";
 
-const CAMPOS_OBRIGATORIOS = ["nome", "cargo", "departamento", "filial", "gestor", "admissao"];
+export const CAMPOS_OBRIGATORIOS = ["nome", "cargo", "departamento", "filial", "gestor", "admissao"];
 
 const ESTADO_INICIAL = {
   nome: "",
