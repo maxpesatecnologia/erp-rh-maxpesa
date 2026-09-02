@@ -1,5 +1,4 @@
 import { CheckCircle2, Circle, MapPin, CalendarClock } from "lucide-react";
-import SourceTag from "../../components/SourceTag";
 import Avatar from "../../components/Avatar";
 import { DESLIGAMENTOS } from "../../data/mock/desligamento";
 import { COLABORADORES } from "../../data/mock/colaboradores";
@@ -27,7 +26,6 @@ export default function DesligamentoDigital() {
           <h1>Desligamento Digital</h1>
           <div className="page-subtitle">Checklist de saída, devolução de equipamentos, acerto rescisório e baixa no Domínio</div>
         </div>
-        <SourceTag path="SharePoint / RH / Desligamento / Checklist_Desligamentos.xlsx → Domínio Sistemas" />
       </div>
 
       <div className="grid grid-2">

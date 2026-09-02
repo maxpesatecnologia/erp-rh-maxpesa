@@ -1,5 +1,4 @@
 import { CheckCircle2, XCircle } from "lucide-react";
-import SourceTag from "../../components/SourceTag";
 import { CONTRATOS } from "../../data/mock/equipes";
 
 const REQ_LABELS = {
@@ -22,7 +21,6 @@ export default function GestaoEquipes() {
             com pendência são bloqueados para a operação.
           </div>
         </div>
-        <SourceTag path="SharePoint / Operacional / Contratos / Equipes_por_Contrato.xlsx" />
       </div>
 
       {CONTRATOS.map((contrato) => (

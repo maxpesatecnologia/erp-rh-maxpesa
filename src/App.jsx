@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import CadastroColaboradores from "./pages/colaboradores/CadastroColaboradores";
 import PortalColaborador from "./pages/portal/PortalColaborador";
 import Recrutamento from "./pages/recrutamento/Recrutamento";
+import BancoCurriculos from "./pages/recrutamento/BancoCurriculos";
 import AdmissaoDigital from "./pages/admissao/AdmissaoDigital";
 import DesligamentoDigital from "./pages/desligamento/DesligamentoDigital";
 import Treinamentos from "./pages/treinamentos/Treinamentos";
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/colaboradores" element={withLayout(<CadastroColaboradores />)} />
           <Route path="/portal" element={withLayout(<PortalColaborador />)} />
           <Route path="/recrutamento" element={withLayout(<Recrutamento />)} />
+          <Route path="/recrutamento/banco-curriculos" element={withLayout(<BancoCurriculos />)} />
           <Route path="/admissao" element={withLayout(<AdmissaoDigital />)} />
           <Route path="/desligamento" element={withLayout(<DesligamentoDigital />)} />
           <Route path="/treinamentos" element={withLayout(<Treinamentos />)} />

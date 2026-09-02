@@ -1,4 +1,3 @@
-import SourceTag from "../../components/SourceTag";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import { DOCUMENTOS_LEGAIS, DDS_REGISTROS, APRS, INSPECOES, NAO_CONFORMIDADES, CATS } from "../../data/mock/seguranca";
@@ -11,7 +10,6 @@ export default function SegurancaTrabalho() {
           <h1>Segurança do Trabalho</h1>
           <div className="page-subtitle">PGR, PCMSO, CAT, APR, DDS, inspeções, incidentes e plano de ação</div>
         </div>
-        <SourceTag path="SharePoint / SESMT / Seguranca_do_Trabalho" />
       </div>
 
       <div className="card card-pad" style={{ marginBottom: 18 }}>

@@ -96,8 +96,6 @@ Cada módulo lê dados de `src/data/mock/*.js`. Esses arquivos foram montados **
 as planilhas do SharePoint da Maxpesa teriam** (ex.: `Cadastro_Colaboradores.xlsx`, `Controle_ASO.xlsx`,
 `Estoque_e_Entregas.xlsx`), para que a troca por dados reais não exija redesenhar as telas — só troca a fonte.
 
-Cada página mostra uma etiqueta "📁 Fonte planejada: ..." indicando de onde aquele dado deveria vir em produção.
-
 ### Próximo passo: ligar ao SharePoint de verdade
 
 Isso precisa de um **registro de aplicativo no Azure AD / Microsoft Entra ID**, no tenant Microsoft 365 da
@@ -119,7 +117,7 @@ Solides, relógio de ponto, WhatsApp Business, Outlook e Teams.
 
 ```
 src/
-  components/     Sidebar, Topbar, Layout, ProtectedRoute, DataTable, StatusBadge, SourceTag
+  components/     Sidebar, Topbar, Layout, ProtectedRoute, DataTable, StatusBadge
   context/         AuthContext (login, sessão, perfil)
   lib/             supabaseClient, motor de respostas da IA Corporativa
   config/modules.js  Lista de módulos do menu + quem pode acessar cada um

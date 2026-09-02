@@ -6,6 +6,7 @@ import {
   Users,
   IdCard,
   Target,
+  FolderOpen,
   FileText,
   GraduationCap,
   TrendingUp,
@@ -58,6 +59,12 @@ export const NAV_SECTIONS = [
         label: "Recrutamento & Seleção",
         icon: Target,
         roles: ["admin", "rh"],
+      },
+      {
+        path: "/recrutamento/banco-curriculos",
+        label: "Banco de Currículos",
+        icon: FolderOpen,
+        roles: ["admin", "rh", "gestor"],
       },
       {
         path: "/admissao",

@@ -1,5 +1,4 @@
 import { Cake, BarChart3 } from "lucide-react";
-import SourceTag from "../../components/SourceTag";
 import { COMUNICADOS, ANIVERSARIANTES, ENQUETES } from "../../data/mock/comunicacao";
 
 export default function ComunicacaoInterna() {
@@ -10,7 +9,6 @@ export default function ComunicacaoInterna() {
           <h1>Comunicação Interna</h1>
           <div className="page-subtitle">Mural, comunicados, notícias, enquetes, aniversariantes e calendário</div>
         </div>
-        <SourceTag path="SharePoint / Comunicacao / Mural" />
       </div>
 
       <div className="grid grid-2">

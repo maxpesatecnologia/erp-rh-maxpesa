@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { UploadCloud, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import { CAMPOS_OBRIGATORIOS } from "./NovoColaboradorForm";
@@ -97,6 +98,36 @@ function parseCSV(texto) {
   return { cabecalho, linhas: linhasDados };
 }
 
+// Monta {cabecalho, linhas} a partir de uma matriz de linhas (linha 0 = cabeçalho),
+// formato comum entre o parser de CSV e o de planilhas Excel.
+function linhasParaRegistros(matriz) {
+  const linhas = matriz.filter((linha) => linha.some((c) => String(c ?? "").trim() !== ""));
+  if (linhas.length === 0) return { cabecalho: [], linhas: [] };
+  const cabecalho = linhas[0].map((c) => String(c ?? "").trim());
+  const linhasDados = linhas.slice(1).map((linha) => {
+    const registro = {};
+    cabecalho.forEach((campo, i) => {
+      registro[campo] = String(linha[i] ?? "").trim();
+    });
+    return registro;
+  });
+  return { cabecalho, linhas: linhasDados };
+}
+
+// Lê a primeira planilha de um arquivo .xlsx/.xls, convertendo datas para AAAA-MM-DD
+// (dateNF) para casar com o mesmo formato aceito na importação via CSV.
+function parseExcel(arrayBuffer) {
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const primeiraAba = workbook.Sheets[workbook.SheetNames[0]];
+  const matriz = XLSX.utils.sheet_to_json(primeiraAba, {
+    header: 1,
+    raw: false,
+    dateNF: "yyyy-mm-dd",
+    defval: "",
+  });
+  return linhasParaRegistros(matriz);
+}
+
 // Aceita AAAA-MM-DD (padrão interno) e DD/MM/AAAA (comum em export de Excel BR).
 function normalizarData(valor) {
   if (!valor) return null;
@@ -133,6 +164,19 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar }) {
 
   useEffect(() => () => URL.revokeObjectURL(modeloUrl), [modeloUrl]);
 
+  function processarRegistros(cabecalho, linhas) {
+    const colunasFaltando = CAMPOS_OBRIGATORIOS.filter((c) => !cabecalho.includes(c));
+    if (colunasFaltando.length > 0) {
+      setErroArquivo(`Arquivo sem as colunas obrigatórias: ${colunasFaltando.join(", ")}.`);
+      return;
+    }
+    const processadas = linhas.map((registro) => {
+      const { erros, admissaoNormalizada } = validarLinha(registro);
+      return { dados: { ...registro, admissao: admissaoNormalizada ?? registro.admissao }, erros };
+    });
+    setLinhasProcessadas(processadas);
+  }
+
   function handleArquivo(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -140,25 +184,34 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar }) {
     setErroArquivo("");
     setLinhasProcessadas(null);
 
+    const extensao = file.name.split(".").pop()?.toLowerCase();
+    const ehExcel = extensao === "xlsx" || extensao === "xls";
+
+    if (!ehExcel && extensao !== "csv") {
+      setErroArquivo("Formato não suportado. Envie um arquivo .csv, .xlsx ou .xls.");
+      return;
+    }
+
     const leitor = new FileReader();
     leitor.onload = () => {
       try {
-        const { cabecalho, linhas } = parseCSV(String(leitor.result));
-        const colunasFaltando = CAMPOS_OBRIGATORIOS.filter((c) => !cabecalho.includes(c));
-        if (colunasFaltando.length > 0) {
-          setErroArquivo(`Arquivo sem as colunas obrigatórias: ${colunasFaltando.join(", ")}.`);
-          return;
-        }
-        const processadas = linhas.map((registro) => {
-          const { erros, admissaoNormalizada } = validarLinha(registro);
-          return { dados: { ...registro, admissao: admissaoNormalizada ?? registro.admissao }, erros };
-        });
-        setLinhasProcessadas(processadas);
+        const { cabecalho, linhas } = ehExcel
+          ? parseExcel(leitor.result)
+          : parseCSV(String(leitor.result));
+        processarRegistros(cabecalho, linhas);
       } catch {
-        setErroArquivo("Não foi possível ler o arquivo. Confirme que é um CSV válido.");
+        setErroArquivo(
+          ehExcel
+            ? "Não foi possível ler a planilha. Confirme que é um arquivo Excel válido."
+            : "Não foi possível ler o arquivo. Confirme que é um CSV válido."
+        );
       }
     };
-    leitor.readAsText(file, "utf-8");
+    if (ehExcel) {
+      leitor.readAsArrayBuffer(file);
+    } else {
+      leitor.readAsText(file, "utf-8");
+    }
   }
 
   const validas = linhasProcessadas?.filter((l) => l.erros.length === 0) ?? [];
@@ -190,11 +243,11 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar }) {
 
       <label className="upload-drop" htmlFor="import-colaboradores-input">
         <UploadCloud size={22} />
-        <span>{arquivo ? arquivo.name : "Clique para selecionar um arquivo .csv"}</span>
+        <span>{arquivo ? arquivo.name : "Clique para selecionar um arquivo .csv, .xlsx ou .xls"}</span>
         <input
           id="import-colaboradores-input"
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
           onChange={handleArquivo}
           style={{ display: "none" }}
         />

@@ -1,5 +1,5 @@
 import { CheckCircle2, Circle, MapPin, CalendarClock } from "lucide-react";
-import SourceTag from "../../components/SourceTag";
+import Avatar from "../../components/Avatar";
 import { ADMISSOES } from "../../data/mock/admissao";
 
 const CHECKLIST_LABELS = {
@@ -9,15 +9,6 @@ const CHECKLIST_LABELS = {
   assinaturaContrato: "Assinatura eletrônica do contrato",
   integracaoDominio: "Envio ao Domínio Sistemas",
 };
-
-function getInitials(nome) {
-  return nome
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("");
-}
 
 function getStatus(pct) {
   if (pct === 100) return { label: "Concluída", badgeClass: "badge-success" };
@@ -33,7 +24,6 @@ export default function AdmissaoDigital() {
           <h1>Admissão Digital</h1>
           <div className="page-subtitle">Checklist, upload de documentos, assinatura eletrônica e workflow de aprovação</div>
         </div>
-        <SourceTag path="SharePoint / RH / Admissao_Digital / Checklist_Admissoes.xlsx → Domínio Sistemas" />
       </div>
 
       <div className="grid grid-2">
@@ -45,7 +35,7 @@ export default function AdmissaoDigital() {
           return (
             <div className="card admissao-card" key={adm.id}>
               <div className="admissao-card-header">
-                <div className="admissao-avatar">{getInitials(adm.nome)}</div>
+                <Avatar nome={adm.nome} foto={adm.foto} size={44} />
                 <div className="admissao-card-title">
                   <div className="admissao-name">{adm.nome}</div>
                   <div className="admissao-cargo">{adm.cargo}</div>

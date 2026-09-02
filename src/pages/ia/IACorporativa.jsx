@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import SourceTag from "../../components/SourceTag";
 import { useAuth } from "../../context/AuthContext";
 import { responder, SUGESTOES } from "../../lib/iaCorporativa";
 
@@ -30,7 +29,6 @@ export default function IACorporativa() {
           <h1>IA Corporativa</h1>
           <div className="page-subtitle">Respostas automáticas sobre NRs, ASO, treinamentos, procedimentos e equipes</div>
         </div>
-        <SourceTag path="SharePoint (documentos) + Cadastro de Colaboradores/Operadores + Domínio Sistemas" />
       </div>
 
       <div className="card card-pad">

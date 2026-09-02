@@ -1,5 +1,4 @@
 import { Users, TrendingDown, CalendarX, ShieldCheck, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import SourceTag from "../components/SourceTag";
 import DataTable from "../components/DataTable";
 import Sparkline from "../components/charts/Sparkline";
 import TrendChart from "../components/charts/TrendChart";
@@ -221,7 +220,6 @@ export default function Dashboard() {
           <h1>Dashboard Executivo</h1>
           <div className="page-subtitle">Visão consolidada de indicadores de RH da Maxpesa</div>
         </div>
-        <SourceTag path="SharePoint / RH / Indicadores / Dashboard_Executivo.xlsx" />
       </div>
 
       <div className="grid grid-4" style={{ marginBottom: 22 }}>

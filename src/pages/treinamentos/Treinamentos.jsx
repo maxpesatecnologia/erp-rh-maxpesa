@@ -1,5 +1,4 @@
 import { Bell } from "lucide-react";
-import SourceTag from "../../components/SourceTag";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import { TREINAMENTOS } from "../../data/mock/treinamentos";
@@ -12,7 +11,6 @@ export default function Treinamentos() {
           <h1>Treinamentos</h1>
           <div className="page-subtitle">Cursos, certificados, reciclagens de NR e controle de validade</div>
         </div>
-        <SourceTag path="SharePoint / RH / Treinamentos / Controle_Treinamentos_NRs.xlsx" />
       </div>
 
       <div className="card card-pad">

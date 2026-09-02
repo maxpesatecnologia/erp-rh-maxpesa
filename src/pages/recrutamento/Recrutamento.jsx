@@ -1,8 +1,10 @@
 import { useState } from "react";
-import SourceTag from "../../components/SourceTag";
+import { useNavigate } from "react-router-dom";
+import { FolderOpen } from "lucide-react";
 import { PIPELINE_STAGES } from "../../data/mock/recrutamento";
 
 export default function Recrutamento() {
+  const navigate = useNavigate();
   const [stages, setStages] = useState(PIPELINE_STAGES);
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverStageId, setDragOverStageId] = useState(null);
@@ -33,7 +35,15 @@ export default function Recrutamento() {
           <h1>Recrutamento & Seleção</h1>
           <div className="page-subtitle">Pipeline Kanban de vagas — banco de currículos, entrevistas e avaliações</div>
         </div>
-        <SourceTag path="SharePoint / RH / Recrutamento / Pipeline_Vagas.xlsx + LinkedIn Talent" />
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            className="btn btn-outline"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={() => navigate("/recrutamento/banco-curriculos")}
+          >
+            <FolderOpen size={16} /> Banco de currículos
+          </button>
+        </div>
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: `repeat(${stages.length}, 1fr)`, alignItems: "start" }}>

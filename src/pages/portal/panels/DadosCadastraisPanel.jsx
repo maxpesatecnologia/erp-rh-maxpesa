@@ -25,6 +25,10 @@ export default function DadosCadastraisPanel() {
     setRascunho((prev) => ({ ...prev, [secao]: { ...prev[secao], [campo]: valor } }));
   }
 
+  function editarCampo(campo, valor) {
+    setRascunho((prev) => ({ ...prev, [campo]: valor }));
+  }
+
   function iniciarEdicao() {
     setRascunho(dados);
     setEditando(true);
@@ -49,7 +53,7 @@ export default function DadosCadastraisPanel() {
       <div className="panel-head">
         <div>
           <div className="section-title">Dados cadastrais</div>
-          <div className="section-hint">Endereço, contato de emergência e dados bancários.</div>
+          <div className="section-hint">Telefone, endereço, contato de emergência e dados bancários.</div>
         </div>
         {!editando && (
           <button className="btn btn-outline" onClick={iniciarEdicao}>
@@ -63,6 +67,13 @@ export default function DadosCadastraisPanel() {
           <Check size={14} /> Alterações salvas localmente. Em produção, isso é sincronizado com o Domínio Sistemas.
         </div>
       )}
+
+      <div className="panel-fieldset" style={{ marginTop: 0, paddingTop: 0, borderTop: "none" }}>
+        <div className="panel-fieldset-title">Dados pessoais</div>
+        <div className="form-grid">
+          <Field label="Telefone" value={d.telefone} editing={editando} onChange={(v) => editarCampo("telefone", v)} />
+        </div>
+      </div>
 
       <div className="panel-fieldset">
         <div className="panel-fieldset-title">Endereço</div>
@@ -81,7 +92,7 @@ export default function DadosCadastraisPanel() {
         <div className="form-grid">
           <Field label="Nome" value={d.contatoEmergencia.nome} editing={editando} onChange={(v) => editarSecao("contatoEmergencia", "nome", v)} />
           <Field label="Parentesco" value={d.contatoEmergencia.parentesco} editing={editando} onChange={(v) => editarSecao("contatoEmergencia", "parentesco", v)} />
-          <Field label="Telefone" value={d.contatoEmergencia.telefone} editing={editando} onChange={(v) => editarSecao("contatoEmergencia", "telefone", v)} />
+          <Field label="Telefone de contato emergencial" value={d.contatoEmergencia.telefone} editing={editando} onChange={(v) => editarSecao("contatoEmergencia", "telefone", v)} />
         </div>
       </div>
 

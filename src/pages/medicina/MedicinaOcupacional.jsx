@@ -1,4 +1,3 @@
-import SourceTag from "../../components/SourceTag";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import { EXAMES_ASO, VACINAS, CLINICAS } from "../../data/mock/medicina";
@@ -11,7 +10,6 @@ export default function MedicinaOcupacional() {
           <h1>Medicina Ocupacional</h1>
           <div className="page-subtitle">ASO, exames, vacinas, clínicas parceiras e alertas de validade</div>
         </div>
-        <SourceTag path="SharePoint / SESMT / Medicina_Ocupacional / Controle_ASO.xlsx" />
       </div>
 
       <div className="card card-pad" style={{ marginBottom: 18 }}>

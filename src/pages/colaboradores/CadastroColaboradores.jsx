@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Plus, Upload, X } from "lucide-react";
-import SourceTag from "../../components/SourceTag";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import Avatar from "../../components/Avatar";
@@ -75,7 +74,6 @@ export default function CadastroColaboradores() {
           <div className="page-subtitle">Cadastro único: dados pessoais, profissionais, histórico e documentos</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <SourceTag path="SharePoint / RH / Colaboradores / Cadastro_Colaboradores.xlsx" />
           <button
             className="btn btn-outline"
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}

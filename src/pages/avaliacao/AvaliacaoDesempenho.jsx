@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import SourceTag from "../../components/SourceTag";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import Avatar from "../../components/Avatar";
@@ -36,7 +35,6 @@ export default function AvaliacaoDesempenho() {
           <h1>Avaliação de Desempenho</h1>
           <div className="page-subtitle">Metas, competências e plano de desenvolvimento individual (PDI) por colaborador</div>
         </div>
-        <SourceTag path="SharePoint / RH / Desempenho / Avaliacoes_PDI.xlsx" />
       </div>
 
       <div className="card card-pad">

@@ -1,16 +1,7 @@
 import { Wrench, Gauge, Clock, ShieldCheck, Building2, Star, AlertTriangle } from "lucide-react";
-import SourceTag from "../../components/SourceTag";
 import StatusBadge from "../../components/StatusBadge";
+import Avatar from "../../components/Avatar";
 import { OPERADORES } from "../../data/mock/operadores";
-
-function getInitials(nome) {
-  return nome
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("");
-}
 
 function tierClass(categoria) {
   if (categoria === "Sênior") return "tier-senior";
@@ -33,7 +24,6 @@ export default function OperadoresEquipamentos() {
           <h1>Operadores de Equipamentos</h1>
           <div className="page-subtitle">Diferencial Maxpesa — passaporte operacional completo de cada operador</div>
         </div>
-        <SourceTag path="SharePoint / Operacional / Operadores / Cadastro_Operadores.xlsx" />
       </div>
 
       <div className="grid grid-2">
@@ -42,7 +32,7 @@ export default function OperadoresEquipamentos() {
           return (
             <div className="card operador-card" key={op.id}>
               <div className="operador-header">
-                <div className="operador-avatar">{getInitials(op.nome)}</div>
+                <Avatar nome={op.nome} foto={op.foto} size={46} />
                 <div className="operador-card-title">
                   <div className="operador-name-row">
                     <span className="operador-name">{op.nome}</span>

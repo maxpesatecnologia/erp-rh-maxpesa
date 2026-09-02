@@ -1,4 +1,3 @@
-import SourceTag from "../../components/SourceTag";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import { ESTOQUE_EPI, ENTREGAS_EPI } from "../../data/mock/epis";
@@ -11,7 +10,6 @@ export default function GestaoEPIs() {
           <h1>Gestão de EPIs</h1>
           <div className="page-subtitle">Estoque, entregas, trocas, validades e assinaturas digitais</div>
         </div>
-        <SourceTag path="SharePoint / SESMT / EPIs / Estoque_e_Entregas.xlsx" />
       </div>
 
       <div className="card card-pad" style={{ marginBottom: 18 }}>

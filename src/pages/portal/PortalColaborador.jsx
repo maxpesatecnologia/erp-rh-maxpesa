@@ -12,7 +12,6 @@ import {
   LifeBuoy,
   Bot,
 } from "lucide-react";
-import SourceTag from "../../components/SourceTag";
 import { useAuth } from "../../context/AuthContext";
 import DadosCadastraisPanel from "./panels/DadosCadastraisPanel";
 import SolicitarFeriasPanel from "./panels/SolicitarFeriasPanel";
@@ -63,7 +62,6 @@ export default function PortalColaborador() {
             Olá, {user?.nome ?? "colaborador"} — aqui estão os serviços disponíveis para você.
           </div>
         </div>
-        <SourceTag path="Domínio Sistemas (férias/banco de horas) + SharePoint (documentos)" />
       </div>
 
       <div className="grid grid-3">
@@ -76,8 +74,8 @@ export default function PortalColaborador() {
               key={acao.id}
               onClick={() => abrirAcao(acao)}
             >
-              <div style={{ marginBottom: 8, color: "var(--color-accent)" }}>
-                <Icon size={24} />
+              <div className="action-icon">
+                <Icon size={22} />
               </div>
               <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{acao.titulo}</div>
               <div style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}>{acao.desc}</div>
