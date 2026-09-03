@@ -45,34 +45,34 @@ vai garantir a segurança e a trava de acesso reais.
 4. No SQL Editor do Supabase, crie a tabela de perfis e as políticas de segurança (RLS):
 
    ```sql
-   create table profiles (
+   create table rh_profiles (
      id uuid primary key references auth.users (id) on delete cascade,
      nome text not null,
      role text not null check (role in ('admin', 'rh', 'gestor', 'colaborador')),
      filial text
    );
 
-   alter table profiles enable row level security;
+   alter table rh_profiles enable row level security;
 
    -- cada usuário pode ler o próprio perfil
    create policy "usuário lê o próprio perfil"
-     on profiles for select
+     on rh_profiles for select
      using (auth.uid() = id);
 
    -- admin/rh podem ler todos os perfis (ajuste conforme a regra real da Maxpesa)
    create policy "admin e rh leem todos os perfis"
-     on profiles for select
+     on rh_profiles for select
      using (
        exists (
-         select 1 from profiles p
+         select 1 from rh_profiles p
          where p.id = auth.uid() and p.role in ('admin', 'rh')
        )
      );
    ```
 
 5. Crie os usuários em **Authentication → Users** (o app não tem tela de cadastro público) e depois insira a
-   linha correspondente em `profiles` com o `role` de cada um. É essa linha em `profiles` que libera o acesso:
-   sem ela, o login é recusado mesmo com e-mail/senha corretos (ver item abaixo).
+   linha correspondente em `rh_profiles` com o `role` de cada um. É essa linha em `rh_profiles` que libera o
+   acesso: sem ela, o login é recusado mesmo com e-mail/senha corretos (ver item abaixo).
 6. Reinicie `npm run dev`. O app detecta o `.env` preenchido e passa a usar o Supabase de verdade — o modo demo
    é desativado automaticamente.
 
@@ -80,15 +80,26 @@ O front-end já está todo preparado para isso: veja `src/lib/supabaseClient.js`
 Cada módulo do menu (`src/config/modules.js`) já declara quais `roles` podem acessá-lo — é só ajustar essa lista
 conforme a política de acesso definitiva da Maxpesa.
 
+### Convenção de prefixo `rh_` (banco compartilhado entre sistemas)
+
+O projeto Supabase pode acabar sendo compartilhado entre vários sistemas internos da Maxpesa, não só este ERP
+de RH. Para evitar colisão de nomes e deixar claro de qual sistema é cada tabela, **toda tabela criada por este
+app usa o prefixo `rh_`** — `rh_profiles`, e futuramente `rh_colaboradores`, `rh_treinamentos`,
+`rh_desligamentos` etc. conforme cada módulo for migrado de `src/data/mock/` para dados reais. Ao criar uma
+tabela nova para este sistema, mantenha o prefixo.
+
 ### Login restrito a e-mails pré-liberados
 
 Não existe formulário de cadastro no app — só a tela de login. O controle de quem pode entrar funciona assim:
 
-- **Modo demo:** só os 4 e-mails listados em `src/data/demoUsers.js` funcionam.
+- **Modo demo:** só os 4 e-mails listados em `src/data/demoUsers.js` funcionam. É só um fallback para navegar
+  pelas telas antes do Supabase estar pronto — some sozinho assim que o `.env` for preenchido com um projeto
+  real (`isSupabaseConfigured` passa a `true`), sem precisar remover nada manualmente.
 - **Modo Supabase:** o login exige uma conta em **Authentication → Users** *e* uma linha correspondente em
-  `profiles`. Se alguém autenticar mas não tiver linha em `profiles` (ou seja, nunca foi provisionado pelo
-  RH/administrador), o app encerra a sessão automaticamente e mostra "Este e-mail ainda não foi liberado para
-  acessar o sistema." — mesmo que a senha esteja correta. Ou seja, `profiles` é a lista de e-mails autorizados.
+  `rh_profiles`. Se alguém autenticar mas não tiver linha em `rh_profiles` (ou seja, nunca foi provisionado
+  pelo RH/administrador), o app encerra a sessão automaticamente e mostra "Este e-mail ainda não foi liberado
+  para acessar o sistema." — mesmo que a senha esteja correta. Ou seja, `rh_profiles` é a lista de e-mails
+  autorizados: ninguém entra por conta própria, só quem o RH/admin inserir lá.
 
 ## Sobre os dados das telas (hoje mockados, no formato do SharePoint)
 
@@ -129,7 +140,7 @@ src/
 
 - [ ] Confirmar a paleta de cores/identidade visual definitiva da Maxpesa (hoje: navy + âmbar, estilo
       industrial/segurança do trabalho) e ajustar `src/index.css`.
-- [ ] Criar o projeto Supabase real e a tabela `profiles` (passo a passo acima).
+- [ ] Criar o projeto Supabase real e a tabela `rh_profiles` (passo a passo acima).
 - [ ] Obter credenciais do Azure AD/Entra ID para a integração com SharePoint.
 - [ ] Substituir os arquivos de `src/data/mock/` pelas chamadas reais (SharePoint / Domínio Sistemas / Supabase).
 - [ ] Detalhar as regras de acesso por perfil em `src/config/modules.js` junto com o RH da Maxpesa.

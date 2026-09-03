@@ -5,14 +5,16 @@ import { useTheme } from "../context/ThemeContext";
 import { DEMO_USERS } from "../data/demoUsers";
 
 export default function Login() {
-  const { signIn, isSupabaseConfigured } = useAuth();
+  const { signIn, requestPasswordReset, isSupabaseConfigured } = useAuth();
   const { theme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const [mode, setMode] = useState("login"); // "login" | "forgot"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -27,6 +29,27 @@ export default function Login() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Sempre mostra a mesma mensagem de sucesso, exista ou não o e-mail — não é
+  // pra dar pra descobrir por aqui quais e-mails têm conta no sistema.
+  async function handleForgotSubmit(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await requestPasswordReset(email);
+    } catch {
+      // ignorado de propósito
+    } finally {
+      setSubmitting(false);
+      setResetSent(true);
+    }
+  }
+
+  function toggleMode() {
+    setMode((m) => (m === "login" ? "forgot" : "login"));
+    setError("");
+    setResetSent(false);
   }
 
   function fillDemo(user) {
@@ -49,33 +72,66 @@ export default function Login() {
 
         {error && <div className="login-error">{error}</div>}
 
-        <form onSubmit={handleSubmit}>
-          <div className="field-group">
-            <label htmlFor="email">E-mail corporativo</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="seu.nome@maxpesa.com.br"
-              required
-            />
-          </div>
-          <div className="field-group">
-            <label htmlFor="password">Senha</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
-          </div>
-          <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>
-            {submitting ? "Entrando…" : "Entrar"}
+        {mode === "login" ? (
+          <form onSubmit={handleSubmit}>
+            <div className="field-group">
+              <label htmlFor="email">E-mail corporativo</label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu.nome@maxpesa.com.br"
+                required
+              />
+            </div>
+            <div className="field-group">
+              <label htmlFor="password">Senha</label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+            <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>
+              {submitting ? "Entrando…" : "Entrar"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleForgotSubmit}>
+            {resetSent ? (
+              <div className="inline-banner success">
+                Se esse e-mail tiver uma conta no sistema, um link para redefinir a senha foi enviado para ele.
+              </div>
+            ) : (
+              <>
+                <div className="field-group">
+                  <label htmlFor="reset-email">E-mail corporativo</label>
+                  <input
+                    id="reset-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="seu.nome@maxpesa.com.br"
+                    required
+                  />
+                </div>
+                <button className="btn btn-primary btn-block" type="submit" disabled={submitting}>
+                  {submitting ? "Enviando…" : "Enviar link de recuperação"}
+                </button>
+              </>
+            )}
+          </form>
+        )}
+
+        {isSupabaseConfigured && (
+          <button type="button" className="link-button" onClick={toggleMode}>
+            {mode === "login" ? "Esqueci minha senha" : "Voltar para o login"}
           </button>
-        </form>
+        )}
 
         {!isSupabaseConfigured && (
           <div className="login-hint">

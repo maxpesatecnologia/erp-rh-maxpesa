@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 export default function BarChart({ data, color = "var(--color-accent)", valueFormat = (v) => v }) {
-  const max = Math.max(...data.map((d) => d.value));
+  const max = Math.max(1, ...data.map((d) => d.value));
   const [hoverIndex, setHoverIndex] = useState(null);
 
   return (

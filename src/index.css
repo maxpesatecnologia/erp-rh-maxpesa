@@ -237,6 +237,12 @@ input, select, textarea {
   overflow-y: auto;
   z-index: 20;
   border-right: 3px solid var(--color-accent);
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge/IE */
+}
+
+.sidebar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Edge */
 }
 
 .sidebar-brand {
@@ -456,10 +462,6 @@ input, select, textarea {
   transition: box-shadow var(--dur-base) var(--ease-premium), border-color var(--dur-base) var(--ease-premium), transform var(--dur-base) var(--ease-premium);
 }
 
-.card:hover {
-  box-shadow: var(--shadow-md);
-}
-
 .action-card {
   cursor: pointer;
 }
@@ -514,18 +516,19 @@ input, select, textarea {
 }
 
 .kpi-card {
-  padding: 18px 20px;
+  padding: 20px 22px 16px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border-top: 3px solid var(--color-accent);
 }
 
 .kpi-card-bottom {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 10px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
   gap: 10px;
 }
 
@@ -533,29 +536,32 @@ input, select, textarea {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 10px;
 }
 
 .kpi-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-md);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: var(--color-subtle);
+  color: var(--color-text-muted);
 }
 
-.kpi-icon-success { background: var(--color-success-bg); color: var(--color-success); }
-.kpi-icon-info    { background: var(--color-info-bg); color: var(--color-info); }
-.kpi-icon-warning { background: var(--color-warning-bg); color: var(--color-warning); }
-.kpi-icon-danger  { background: var(--color-danger-bg); color: var(--color-danger); }
-.kpi-icon-neutral { background: var(--color-subtle); color: var(--color-text-muted); }
-
-.card.kpi-card.accent-success { border-top-color: var(--color-success); }
-.card.kpi-card.accent-info    { border-top-color: var(--color-info); }
-.card.kpi-card.accent-warning { border-top-color: var(--color-warning); }
-.card.kpi-card.accent-danger  { border-top-color: var(--color-danger); }
-.card.kpi-card.accent-neutral { border-top-color: var(--color-secondary); }
+/* Cor por card foi removida de propósito: um dashboard executivo sério
+   reserva cor para o que muda de fato (a tendência), não para decorar
+   cada tile de um jeito diferente. */
+.kpi-icon-success,
+.kpi-icon-info,
+.kpi-icon-warning,
+.kpi-icon-danger,
+.kpi-icon-neutral {
+  background: var(--color-subtle);
+  color: var(--color-text-muted);
+}
 
 .kpi-label {
   font-size: 12px;
@@ -567,30 +573,30 @@ input, select, textarea {
 
 .kpi-value {
   font-family: var(--font-heading);
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.4px;
-  margin-top: 6px;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  margin-top: 10px;
+  line-height: 1.05;
   font-variant-numeric: tabular-nums;
 }
 
 .kpi-trend {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 11.5px;
-  font-weight: 700;
-  padding: 3px 8px 3px 6px;
-  border-radius: 20px;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
-.kpi-trend.up { color: var(--color-success); background: var(--color-success-bg); }
-.kpi-trend.down { color: var(--color-danger); background: var(--color-danger-bg); }
+.kpi-trend.up { color: var(--color-success); }
+.kpi-trend.down { color: var(--color-danger); }
+.kpi-trend.neutral { color: var(--color-text-muted); }
 
 .kpi-sparkline {
   flex-shrink: 0;
-  opacity: 0.9;
+  opacity: 0.8;
 }
 
 .section-title {
@@ -970,6 +976,23 @@ table.data-table tbody tr:hover {
   margin-bottom: 14px;
 }
 
+.link-button {
+  display: block;
+  width: 100%;
+  text-align: center;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-top: 14px;
+  color: var(--color-accent);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
 .login-hint {
   margin-top: 18px;
   font-size: 11.5px;
@@ -982,6 +1005,33 @@ table.data-table tbody tr:hover {
   width: 100%;
   justify-content: center;
   padding: 11px;
+}
+
+/* ---------- Modal genérico (trocar senha, etc.) ---------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 24px;
+}
+
+.modal-card h3 {
+  font-size: 16px;
+  font-weight: 700;
 }
 
 /* ---------- Access denied ---------- */
@@ -1082,6 +1132,7 @@ table.data-table tbody tr:hover {
 .admissao-card:hover {
   transform: translateY(-3px);
   border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
 }
 
 .admissao-card-header {
@@ -1689,6 +1740,43 @@ table.data-table tbody tr:hover {
 .proportion-legend-pct {
   color: var(--color-text-muted);
   font-size: 11.5px;
+}
+
+/* ---------- Chart empty state ---------- */
+
+.chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 20px;
+  color: var(--color-text-muted);
+}
+
+.chart-empty-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.chart-empty-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.chart-empty-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  max-width: 300px;
+  line-height: 1.5;
 }
 
 /* ---------- Table cell mini bars / meters ---------- */

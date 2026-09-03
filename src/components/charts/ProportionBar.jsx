@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 export default function ProportionBar({ segments, valueFormat = (v) => v }) {
-  const total = segments.reduce((sum, s) => sum + s.value, 0);
+  const total = segments.reduce((sum, s) => sum + s.value, 0) || 1;
   const [hoverIndex, setHoverIndex] = useState(null);
 
   return (

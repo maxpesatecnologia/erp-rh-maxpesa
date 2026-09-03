@@ -4,6 +4,7 @@ import { DEMO_USERS } from "../data/demoUsers";
 
 const AuthContext = createContext(null);
 const DEMO_SESSION_KEY = "maxpesa_demo_session";
+const PASSWORD_RECOVERY_PATH = "/redefinir-senha";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null); // { id, email, nome, role, filial }
@@ -11,6 +12,17 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (isSupabaseConfigured) {
+      // O link de "esqueci minha senha" abre uma sessão temporária de
+      // recuperação só pra trocar a senha ali. Se deixarmos o fluxo normal
+      // rodar, ele checa "tem linha em rh_profiles?" e, sem achar, desloga
+      // automaticamente — derrubando a sessão bem no meio da troca de senha.
+      // Por isso /redefinir-senha cuida da própria sessão sozinha (ver
+      // RedefinirSenha.jsx) e o AuthContext não mexe em nada aqui.
+      if (window.location.pathname === PASSWORD_RECOVERY_PATH) {
+        setLoading(false);
+        return;
+      }
+
       supabase.auth.getSession().then(async ({ data }) => {
         if (data?.session?.user) {
           await hydrateFromSupabase(data.session.user);
@@ -41,14 +53,19 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  // Só entra quem tem uma linha em "profiles": é essa tabela que funciona como
-  // a lista de e-mails pré-liberados. Sem linha lá (usuário nunca provisionado
-  // pelo RH/admin), a sessão é encerrada na hora, mesmo com login/senha válidos.
+  // Só entra quem tem uma linha em "rh_profiles": é essa tabela que funciona
+  // como a lista de e-mails pré-liberados. Sem linha lá (usuário nunca
+  // provisionado pelo RH/admin), a sessão é encerrada na hora, mesmo com
+  // login/senha válidos.
+  //
+  // Prefixo "rh_": o Supabase é compartilhado entre vários sistemas da
+  // Maxpesa. Toda tabela deste app usa esse prefixo para não colidir com as
+  // de outro sistema no mesmo banco.
   async function hydrateFromSupabase(authUser) {
-    // Espera uma tabela "profiles" (id uuid FK -> auth.users.id) com as
+    // Espera uma tabela "rh_profiles" (id uuid FK -> auth.users.id) com as
     // colunas: nome, role, filial. Ver README para o schema + RLS.
     const { data: profile, error } = await supabase
-      .from("profiles")
+      .from("rh_profiles")
       .select("nome, role, filial")
       .eq("id", authUser.id)
       .single();
@@ -96,6 +113,26 @@ export function AuthProvider({ children }) {
     setUser(sessionUser);
   }
 
+  // Só faz sentido com Supabase real: em modo demo não há senha de verdade
+  // por usuário, todo mundo usa "demo123".
+  async function updatePassword(newPassword) {
+    if (!isSupabaseConfigured) {
+      throw new Error("Troca de senha só está disponível com o Supabase configurado.");
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
+  }
+
+  async function requestPasswordReset(email) {
+    if (!isSupabaseConfigured) {
+      throw new Error("Recuperação de senha só está disponível com o Supabase configurado.");
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/redefinir-senha`,
+    });
+    if (error) throw new Error(error.message);
+  }
+
   async function signOut() {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
@@ -106,7 +143,9 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut, isSupabaseConfigured }}>
+    <AuthContext.Provider
+      value={{ user, loading, signIn, signOut, updatePassword, requestPasswordReset, isSupabaseConfigured }}
+    >
       {children}
     </AuthContext.Provider>
   );

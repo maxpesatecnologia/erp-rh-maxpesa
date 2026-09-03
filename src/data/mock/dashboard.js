@@ -12,12 +12,10 @@ export const ABSENTEISMO_TREND = MESES.map(() => 0);
 
 export const ABSENTEISMO_KPI = {
   label: "Absenteísmo (mês)",
-  value: "0%",
-  trend: "0 p.p.",
-  direction: "down",
+  value: "—",
+  trend: "Sem integração de ponto",
+  direction: "neutral",
   icon: "CalendarX",
-  variant: "warning",
-  history: ABSENTEISMO_TREND.slice(-8),
 };
 
 export const FERIAS_PROGRAMADAS = [];

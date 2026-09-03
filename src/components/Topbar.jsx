@@ -1,13 +1,16 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Moon, Sun, LogOut } from "lucide-react";
+import { Moon, Sun, LogOut, KeyRound } from "lucide-react";
 import { ROLE_LABELS } from "../config/modules";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import TrocarSenhaModal from "./TrocarSenhaModal";
 
 export default function Topbar() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isSupabaseConfigured } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const initials = user?.nome
     ? user.nome
@@ -36,6 +39,16 @@ export default function Topbar() {
             <div className="user-avatar">{initials}</div>
           </div>
         )}
+        {isSupabaseConfigured && (
+          <button
+            className="icon-btn"
+            onClick={() => setShowPasswordModal(true)}
+            title="Trocar senha"
+            aria-label="Trocar senha"
+          >
+            <KeyRound size={17} />
+          </button>
+        )}
         <button
           className="icon-btn"
           onClick={toggleTheme}
@@ -48,6 +61,8 @@ export default function Topbar() {
           <LogOut size={17} />
         </button>
       </div>
+
+      {showPasswordModal && <TrocarSenhaModal onClose={() => setShowPasswordModal(false)} />}
     </header>
   );
 }

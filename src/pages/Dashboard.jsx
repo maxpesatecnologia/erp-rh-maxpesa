@@ -1,5 +1,6 @@
-import { Users, TrendingDown, CalendarX, ShieldCheck, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Users, TrendingDown, CalendarX, ShieldCheck, ArrowUpRight, ArrowDownRight, Minus, Building2, PieChart, GraduationCap } from "lucide-react";
 import DataTable from "../components/DataTable";
+import EmptyState from "../components/EmptyState";
 import Sparkline from "../components/charts/Sparkline";
 import TrendChart from "../components/charts/TrendChart";
 import BarChart from "../components/charts/BarChart";
@@ -12,11 +13,9 @@ import { TREINAMENTOS } from "../data/mock/treinamentos";
 const KPI_ICONS = { Users, TrendingDown, CalendarX, ShieldCheck };
 
 const SPARKLINE_COLOR = {
-  neutral: "var(--color-secondary)",
-  success: "var(--color-success)",
-  warning: "var(--color-warning)",
-  info: "var(--color-info)",
-  danger: "var(--color-danger)",
+  up: "var(--color-success)",
+  down: "var(--color-danger)",
+  neutral: "var(--color-text-muted)",
 };
 
 const MES_ABREV = { Jan: 1, Fev: 2, Mar: 3, Abr: 4, Mai: 5, Jun: 6, Jul: 7, Ago: 8, Set: 9, Out: 10, Nov: 11, Dez: 12 };
@@ -103,6 +102,14 @@ function Meter({ value, max, color, valueLabel }) {
 // acabou, então os KPIs "do mês" olham pra trás, como um fechamento mensal real).
 const { ano: ANO_REF, mes: MES_REF } = parseMesLabel(MESES[MESES.length - 1]);
 
+// Sem variação real (delta zero), o card fica neutro em vez de fingir uma
+// tendência de alta ou baixa — cor só aparece quando algo de fato mudou.
+function trendDirection(delta, { invert = false } = {}) {
+  if (!delta) return "neutral";
+  const positive = invert ? delta < 0 : delta > 0;
+  return positive ? "up" : "down";
+}
+
 const headcountAtivo = headcountEm(fimDoMes(ANO_REF, MES_REF));
 const headcountMesAnterior = headcountEm(fimDoMes(ANO_REF, MES_REF - 1));
 const deltaHeadcount = headcountAtivo - headcountMesAnterior;
@@ -121,37 +128,35 @@ const TURNOVER_TREND = MESES.map((label) => {
   return turnoverDoMes(ano, mes);
 });
 
+const totalTreinamentos = TREINAMENTOS.length;
 const treinamentosValidos = TREINAMENTOS.filter((t) => t.status !== "Vencido").length;
-const treinamentosPendentes = TREINAMENTOS.length - treinamentosValidos;
-const pctTreinamentosValidos = Math.round((treinamentosValidos / TREINAMENTOS.length) * 100);
+const treinamentosPendentes = totalTreinamentos - treinamentosValidos;
+const pctTreinamentosValidos = totalTreinamentos === 0 ? null : Math.round((treinamentosValidos / totalTreinamentos) * 100);
 
 const KPIS = [
   {
     label: "Headcount ativo",
     value: String(headcountAtivo),
-    trend: `${deltaHeadcount >= 0 ? "+" : ""}${deltaHeadcount} no mês`,
-    direction: deltaHeadcount >= 0 ? "up" : "down",
+    trend: `${deltaHeadcount > 0 ? "+" : ""}${deltaHeadcount} no mês`,
+    direction: trendDirection(deltaHeadcount),
     icon: "Users",
-    variant: "neutral",
-    history: HEADCOUNT_TREND.slice(-8),
+    history: headcountAtivo > 0 ? HEADCOUNT_TREND.slice(-8) : undefined,
   },
   {
     label: "Turnover (mês)",
     value: `${turnoverMes.toFixed(1).replace(".", ",")}%`,
-    trend: `${deltaTurnover >= 0 ? "+" : ""}${deltaTurnover.toFixed(1).replace(".", ",")} p.p.`,
-    direction: deltaTurnover <= 0 ? "up" : "down",
+    trend: `${deltaTurnover > 0 ? "+" : ""}${deltaTurnover.toFixed(1).replace(".", ",")} p.p.`,
+    direction: trendDirection(Number(deltaTurnover.toFixed(1)), { invert: true }),
     icon: "TrendingDown",
-    variant: deltaTurnover <= 0 ? "success" : "warning",
-    history: TURNOVER_TREND.slice(-8),
+    history: headcountAtivo > 0 ? TURNOVER_TREND.slice(-8) : undefined,
   },
   ABSENTEISMO_KPI,
   {
     label: "Treinamentos válidos",
-    value: `${pctTreinamentosValidos}%`,
-    trend: treinamentosPendentes > 0 ? `-${treinamentosPendentes} pendente(s)` : "Tudo em dia",
-    direction: treinamentosPendentes > 0 ? "down" : "up",
+    value: pctTreinamentosValidos === null ? "—" : `${pctTreinamentosValidos}%`,
+    trend: totalTreinamentos === 0 ? "Sem treinamentos cadastrados" : treinamentosPendentes > 0 ? `-${treinamentosPendentes} pendente(s)` : "Tudo em dia",
+    direction: totalTreinamentos === 0 ? "neutral" : treinamentosPendentes > 0 ? "down" : "up",
     icon: "ShieldCheck",
-    variant: treinamentosPendentes > 0 ? "warning" : "success",
   },
 ];
 
@@ -209,9 +214,13 @@ const INDICADORES_POR_GESTOR = GESTORES.map((gestor) => {
 
 const HEADCOUNT_POR_FILIAL = INDICADORES_POR_FILIAL.map((f) => ({ label: f.filial, value: f.headcount }));
 
+const hasColaboradores = COLABORADORES.length > 0;
+const hasComposicao = COMPOSICAO_SEGMENTS.some((s) => s.value > 0);
+const hasTreinamentos = TREINAMENTOS.length > 0;
+
 export default function Dashboard() {
-  const maxHeadcountFilial = Math.max(...INDICADORES_POR_FILIAL.map((f) => f.headcount));
-  const maxHeadcountGestor = Math.max(...INDICADORES_POR_GESTOR.map((g) => g.headcount));
+  const maxHeadcountFilial = INDICADORES_POR_FILIAL.length ? Math.max(...INDICADORES_POR_FILIAL.map((f) => f.headcount)) : 1;
+  const maxHeadcountGestor = INDICADORES_POR_GESTOR.length ? Math.max(...INDICADORES_POR_GESTOR.map((g) => g.headcount)) : 1;
 
   return (
     <div>
@@ -225,26 +234,26 @@ export default function Dashboard() {
       <div className="grid grid-4" style={{ marginBottom: 22 }}>
         {KPIS.map((kpi) => {
           const Icon = KPI_ICONS[kpi.icon];
-          const TrendIcon = kpi.trend.trim().startsWith("-") ? ArrowDownRight : ArrowUpRight;
+          const TrendIcon = kpi.direction === "neutral" ? Minus : kpi.direction === "down" ? ArrowDownRight : ArrowUpRight;
           return (
-            <div className={`card kpi-card accent-${kpi.variant}`} key={kpi.label}>
+            <div className="card kpi-card" key={kpi.label}>
               <div className="kpi-card-top">
                 <div className="kpi-label">{kpi.label}</div>
                 {Icon && (
-                  <div className={`kpi-icon kpi-icon-${kpi.variant}`}>
-                    <Icon size={18} />
+                  <div className="kpi-icon">
+                    <Icon size={16} strokeWidth={1.8} />
                   </div>
                 )}
               </div>
               <div className="kpi-value">{kpi.value}</div>
               <div className="kpi-card-bottom">
                 <div className={`kpi-trend ${kpi.direction}`}>
-                  <TrendIcon size={12} />
+                  <TrendIcon size={13} />
                   {kpi.trend}
                 </div>
                 {kpi.history && (
                   <div className="kpi-sparkline">
-                    <Sparkline data={kpi.history} color={SPARKLINE_COLOR[kpi.variant]} />
+                    <Sparkline data={kpi.history} color={SPARKLINE_COLOR[kpi.direction]} width={72} height={26} />
                   </div>
                 )}
               </div>
@@ -259,38 +268,62 @@ export default function Dashboard() {
             <div className="section-title">Evolução do headcount</div>
             <div className="section-hint">últimos 12 meses</div>
           </div>
-          <TrendChart
-            data={TENDENCIA}
-            series={[{ key: "headcount", label: "Headcount", color: "var(--chart-1)", area: true }]}
-            valueFormat={(v) => v}
-            yTickFormat={(v) => Math.round(v)}
-          />
+          {hasColaboradores ? (
+            <TrendChart
+              data={TENDENCIA}
+              series={[{ key: "headcount", label: "Headcount", color: "var(--chart-1)", area: true }]}
+              valueFormat={(v) => v}
+              yTickFormat={(v) => Math.round(v)}
+            />
+          ) : (
+            <EmptyState
+              icon={Users}
+              title="Ainda sem colaboradores cadastrados"
+              hint="A evolução do headcount aparece aqui assim que a base de colaboradores for importada."
+            />
+          )}
         </div>
         <div className="card card-pad">
           <div className="section-head">
             <div className="section-title">Turnover x Absenteísmo</div>
             <div className="section-hint">últimos 12 meses · absenteísmo ainda é estimado (sem integração com relógio de ponto)</div>
           </div>
-          <TrendChart
-            data={TENDENCIA}
-            series={[
-              { key: "turnover", label: "Turnover", color: "var(--chart-1)" },
-              { key: "absenteismo", label: "Absenteísmo", color: "var(--chart-2)" },
-            ]}
-            valueFormat={(v) => `${v.toFixed(1).replace(".", ",")}%`}
-            yTickFormat={(v) => `${v.toFixed(0)}%`}
-          />
+          {hasColaboradores ? (
+            <TrendChart
+              data={TENDENCIA}
+              series={[
+                { key: "turnover", label: "Turnover", color: "var(--chart-1)" },
+                { key: "absenteismo", label: "Absenteísmo", color: "var(--chart-2)" },
+              ]}
+              valueFormat={(v) => `${v.toFixed(1).replace(".", ",")}%`}
+              yTickFormat={(v) => `${v.toFixed(0)}%`}
+            />
+          ) : (
+            <EmptyState
+              icon={TrendingDown}
+              title="Sem histórico de turnover"
+              hint="Turnover é calculado a partir da base de colaboradores; absenteísmo depende da integração futura com o relógio de ponto."
+            />
+          )}
         </div>
       </div>
 
       <div className="grid grid-2" style={{ marginBottom: 22 }}>
         <div className="card card-pad">
           <div className="section-title">Headcount por filial</div>
-          <BarChart data={HEADCOUNT_POR_FILIAL} color="var(--color-accent)" />
+          {hasColaboradores ? (
+            <BarChart data={HEADCOUNT_POR_FILIAL} color="var(--color-accent)" />
+          ) : (
+            <EmptyState icon={Building2} title="Nenhuma filial com colaboradores" height={160} />
+          )}
         </div>
         <div className="card card-pad">
           <div className="section-title">Composição da força de trabalho</div>
-          <ProportionBar segments={COMPOSICAO_SEGMENTS} />
+          {hasComposicao ? (
+            <ProportionBar segments={COMPOSICAO_SEGMENTS} />
+          ) : (
+            <EmptyState icon={PieChart} title="Sem colaboradores ativos para compor o quadro" height={160} />
+          )}
         </div>
       </div>
 
@@ -390,7 +423,11 @@ export default function Dashboard() {
       <div className="grid grid-2">
         <div className="card card-pad">
           <div className="section-title">Treinamentos e certificações</div>
-          <ProportionBar segments={TREINAMENTOS_SEGMENTS} />
+          {hasTreinamentos ? (
+            <ProportionBar segments={TREINAMENTOS_SEGMENTS} />
+          ) : (
+            <EmptyState icon={GraduationCap} title="Nenhum treinamento cadastrado ainda" height={160} />
+          )}
         </div>
       </div>
     </div>

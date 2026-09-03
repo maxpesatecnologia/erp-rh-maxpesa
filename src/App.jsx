@@ -4,6 +4,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 import Login from "./pages/Login";
+import RedefinirSenha from "./pages/RedefinirSenha";
 import Dashboard from "./pages/Dashboard";
 import CadastroColaboradores from "./pages/colaboradores/CadastroColaboradores";
 import PortalColaborador from "./pages/portal/PortalColaborador";
@@ -33,6 +34,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/redefinir-senha" element={<RedefinirSenha />} />
           <Route path="/" element={withLayout(<Dashboard />)} />
           <Route path="/colaboradores" element={withLayout(<CadastroColaboradores />)} />
           <Route path="/portal" element={withLayout(<PortalColaborador />)} />
