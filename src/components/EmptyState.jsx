@@ -3,7 +3,7 @@ export default function EmptyState({ icon: Icon, title, hint, height = 220 }) {
     <div className="chart-empty" style={{ minHeight: height }}>
       {Icon && (
         <div className="chart-empty-icon">
-          <Icon size={18} strokeWidth={1.6} />
+          <Icon size={26} strokeWidth={1.6} />
         </div>
       )}
       <div className="chart-empty-title">{title}</div>

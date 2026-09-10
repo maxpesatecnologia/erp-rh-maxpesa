@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Camera, X } from "lucide-react";
+import { isSupabaseConfigured } from "../../lib/supabaseClient";
 
 export const CAMPOS_OBRIGATORIOS = ["nome", "cargo", "departamento", "filial", "gestor", "admissao"];
 
@@ -25,6 +26,7 @@ const ESTADO_INICIAL = {
 export default function NovoColaboradorForm({ onCriar, onCancelar }) {
   const [dados, setDados] = useState(ESTADO_INICIAL);
   const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
   function atualizar(campo, valor) {
     setDados((atual) => ({ ...atual, [campo]: valor }));
@@ -38,7 +40,7 @@ export default function NovoColaboradorForm({ onCriar, onCancelar }) {
     leitor.readAsDataURL(arquivo);
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const faltando = CAMPOS_OBRIGATORIOS.filter((campo) => !String(dados[campo]).trim());
     if (faltando.length > 0) {
@@ -46,15 +48,23 @@ export default function NovoColaboradorForm({ onCriar, onCancelar }) {
       return;
     }
     setErro("");
-    onCriar({ ...dados, dependentes: Number(dados.dependentes) || 0 });
+    setSalvando(true);
+    try {
+      await onCriar({ ...dados, dependentes: Number(dados.dependentes) || 0 });
+    } catch (err) {
+      setErro(err.message || "Erro ao salvar colaborador.");
+    } finally {
+      setSalvando(false);
+    }
   }
 
   return (
     <div className="card card-pad" style={{ marginBottom: 18 }}>
       <div className="section-title">Novo colaborador</div>
       <div style={{ fontSize: 12.5, color: "var(--color-text-muted)", marginBottom: 14 }}>
-        Cadastro salvo apenas nesta sessão (protótipo) — some ao recarregar a página. Em produção, isso grava
-        direto na base real.
+        {isSupabaseConfigured
+          ? "Cadastro gravado direto na base de dados."
+          : "Modo demonstração (sem Supabase configurado): cadastro salvo apenas nesta sessão, some ao recarregar a página."}
       </div>
 
       {erro && <div className="login-error" style={{ marginBottom: 14 }}>{erro}</div>}
@@ -144,8 +154,12 @@ export default function NovoColaboradorForm({ onCriar, onCancelar }) {
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
-          <button type="submit" className="btn btn-primary">Salvar colaborador</button>
-          <button type="button" className="btn btn-outline" onClick={onCancelar}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={salvando}>
+            {salvando ? "Salvando…" : "Salvar colaborador"}
+          </button>
+          <button type="button" className="btn btn-outline" onClick={onCancelar} disabled={salvando}>
+            Cancelar
+          </button>
         </div>
       </form>
     </div>

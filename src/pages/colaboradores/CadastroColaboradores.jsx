@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Upload, X } from "lucide-react";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
@@ -6,6 +6,12 @@ import Avatar from "../../components/Avatar";
 import NovoColaboradorForm from "./NovoColaboradorForm";
 import ImportarColaboradoresForm from "./ImportarColaboradoresForm";
 import { COLABORADORES } from "../../data/mock/colaboradores";
+import { isSupabaseConfigured } from "../../lib/supabaseClient";
+import {
+  listarColaboradores,
+  criarColaborador as criarColaboradorRemoto,
+  importarColaboradores as importarColaboradoresRemoto,
+} from "../../lib/colaboradoresApi";
 
 function proximaMatricula(lista) {
   const maiorNumero = lista.reduce((max, c) => {
@@ -30,13 +36,23 @@ function criarColaborador(novo, id) {
 }
 
 export default function CadastroColaboradores() {
-  const [colaboradores, setColaboradores] = useState(COLABORADORES);
+  const [colaboradores, setColaboradores] = useState(isSupabaseConfigured ? [] : COLABORADORES);
+  const [carregando, setCarregando] = useState(isSupabaseConfigured);
+  const [erroCarregamento, setErroCarregamento] = useState("");
   const [selected, setSelected] = useState(null);
   const [timelineAberta, setTimelineAberta] = useState(false);
   const [formAberto, setFormAberto] = useState(false);
   const [formVisitado, setFormVisitado] = useState(false);
   const [importAberto, setImportAberto] = useState(false);
   const [importVisitado, setImportVisitado] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    listarColaboradores()
+      .then(setColaboradores)
+      .catch((erro) => setErroCarregamento(erro.message))
+      .finally(() => setCarregando(false));
+  }, []);
 
   function handleVerTimeline(colaborador) {
     if (selected?.id === colaborador.id && timelineAberta) {
@@ -47,13 +63,25 @@ export default function CadastroColaboradores() {
     }
   }
 
-  function handleCriar(novo) {
+  async function handleCriar(novo) {
+    if (isSupabaseConfigured) {
+      const colaborador = await criarColaboradorRemoto(novo);
+      setColaboradores((atual) => [colaborador, ...atual]);
+      setFormAberto(false);
+      return;
+    }
     const colaborador = criarColaborador(novo, proximaMatricula(colaboradores));
     setColaboradores((atual) => [colaborador, ...atual]);
     setFormAberto(false);
   }
 
-  function handleImportarEmMassa(linhas) {
+  async function handleImportarEmMassa(linhas) {
+    if (isSupabaseConfigured) {
+      const novos = await importarColaboradoresRemoto(linhas);
+      setColaboradores((atual) => [...novos, ...atual]);
+      setImportAberto(false);
+      return;
+    }
     setColaboradores((atual) => {
       let proximoNumero = Number(proximaMatricula(atual).replace(/\D/g, ""));
       const novos = linhas.map((dados) => {
@@ -119,6 +147,10 @@ export default function CadastroColaboradores() {
 
       <div className="card card-pad">
         <div className="section-title">Colaboradores</div>
+        {erroCarregamento && <div className="login-error" style={{ marginBottom: 14 }}>{erroCarregamento}</div>}
+        {carregando ? (
+          <div className="section-hint">Carregando colaboradores…</div>
+        ) : (
         <DataTable
           columns={[
             { key: "id", label: "Matrícula" },
@@ -149,6 +181,7 @@ export default function CadastroColaboradores() {
           ]}
           rows={colaboradores}
         />
+        )}
       </div>
 
       <div className={`collapse ${timelineAberta ? "open" : ""}`}>

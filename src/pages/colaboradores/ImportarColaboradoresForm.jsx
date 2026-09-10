@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import { CAMPOS_OBRIGATORIOS } from "./NovoColaboradorForm";
+import { isSupabaseConfigured } from "../../lib/supabaseClient";
 
 const COLUNAS_MODELO = [
   "nome",
@@ -155,6 +156,7 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar }) {
   const [arquivo, setArquivo] = useState(null);
   const [linhasProcessadas, setLinhasProcessadas] = useState(null);
   const [erroArquivo, setErroArquivo] = useState("");
+  const [importando, setImportando] = useState(false);
 
   const modeloUrl = useMemo(() => {
     const conteudo = [COLUNAS_MODELO.join(","), LINHA_EXEMPLO.join(",")].join("\n");
@@ -217,16 +219,25 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar }) {
   const validas = linhasProcessadas?.filter((l) => l.erros.length === 0) ?? [];
   const invalidas = linhasProcessadas?.filter((l) => l.erros.length > 0) ?? [];
 
-  function handleConfirmar() {
-    onImportar(validas.map((l) => l.dados));
+  async function handleConfirmar() {
+    setImportando(true);
+    setErroArquivo("");
+    try {
+      await onImportar(validas.map((l) => l.dados));
+    } catch (err) {
+      setErroArquivo(err.message || "Erro ao importar colaboradores.");
+    } finally {
+      setImportando(false);
+    }
   }
 
   return (
     <div className="card card-pad" style={{ marginBottom: 18 }}>
       <div className="section-title">Importar colaboradores</div>
       <div style={{ fontSize: 12.5, color: "var(--color-text-muted)", marginBottom: 14 }}>
-        Importação salva apenas nesta sessão (protótipo) — some ao recarregar a página. Em produção, isso grava
-        direto na base real.
+        {isSupabaseConfigured
+          ? "Importação gravada direto na base de dados."
+          : "Modo demonstração (sem Supabase configurado): importação salva apenas nesta sessão, some ao recarregar a página."}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
@@ -281,10 +292,15 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar }) {
       )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-        <button type="button" className="btn btn-primary" onClick={handleConfirmar} disabled={validas.length === 0}>
-          Confirmar importação ({validas.length})
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleConfirmar}
+          disabled={validas.length === 0 || importando}
+        >
+          {importando ? "Importando…" : `Confirmar importação (${validas.length})`}
         </button>
-        <button type="button" className="btn btn-outline" onClick={onCancelar}>
+        <button type="button" className="btn btn-outline" onClick={onCancelar} disabled={importando}>
           Cancelar
         </button>
       </div>

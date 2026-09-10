@@ -1,4 +1,4 @@
-import { Users, TrendingDown, CalendarX, ShieldCheck, ArrowUpRight, ArrowDownRight, Minus, Building2, PieChart, GraduationCap } from "lucide-react";
+import { Users, TrendingDown, CalendarX, ShieldCheck, ArrowUpRight, ArrowDownRight, Minus, Building2, PieChart, GraduationCap, ChevronRight, Users2, CalendarCheck, UserMinus, BarChart3, Calendar } from "lucide-react";
 import DataTable from "../components/DataTable";
 import EmptyState from "../components/EmptyState";
 import Sparkline from "../components/charts/Sparkline";
@@ -238,13 +238,14 @@ export default function Dashboard() {
           return (
             <div className="card kpi-card" key={kpi.label}>
               <div className="kpi-card-top">
-                <div className="kpi-label">{kpi.label}</div>
                 {Icon && (
                   <div className="kpi-icon">
                     <Icon size={16} strokeWidth={1.8} />
                   </div>
                 )}
+                <ChevronRight size={16} className="kpi-chevron" />
               </div>
+              <div className="kpi-label">{kpi.label}</div>
               <div className="kpi-value">{kpi.value}</div>
               <div className="kpi-card-bottom">
                 <div className={`kpi-trend ${kpi.direction}`}>
@@ -265,8 +266,11 @@ export default function Dashboard() {
       <div className="grid grid-2" style={{ marginBottom: 22 }}>
         <div className="card card-pad">
           <div className="section-head">
-            <div className="section-title">Evolução do headcount</div>
-            <div className="section-hint">últimos 12 meses</div>
+            <div className="section-title">
+              <span className="section-icon"><Users size={17} strokeWidth={1.8} /></span>
+              Evolução do headcount
+            </div>
+            <div className="section-hint"><Calendar size={12} strokeWidth={1.8} /> últimos 12 meses</div>
           </div>
           {hasColaboradores ? (
             <TrendChart
@@ -285,8 +289,11 @@ export default function Dashboard() {
         </div>
         <div className="card card-pad">
           <div className="section-head">
-            <div className="section-title">Turnover x Absenteísmo</div>
-            <div className="section-hint">últimos 12 meses · absenteísmo ainda é estimado (sem integração com relógio de ponto)</div>
+            <div className="section-title">
+              <span className="section-icon"><TrendingDown size={17} strokeWidth={1.8} /></span>
+              Turnover x Absenteísmo
+            </div>
+            <div className="section-hint"><Calendar size={12} strokeWidth={1.8} /> últimos 12 meses · absenteísmo ainda é estimado (sem integração com relógio de ponto)</div>
           </div>
           {hasColaboradores ? (
             <TrendChart
@@ -310,7 +317,13 @@ export default function Dashboard() {
 
       <div className="grid grid-2" style={{ marginBottom: 22 }}>
         <div className="card card-pad">
-          <div className="section-title">Headcount por filial</div>
+          <div className="section-head">
+            <div className="section-title">
+              <span className="section-icon"><Building2 size={17} strokeWidth={1.8} /></span>
+              Headcount por filial
+            </div>
+            <ChevronRight size={16} className="section-chevron" />
+          </div>
           {hasColaboradores ? (
             <BarChart data={HEADCOUNT_POR_FILIAL} color="var(--color-accent)" />
           ) : (
@@ -318,7 +331,13 @@ export default function Dashboard() {
           )}
         </div>
         <div className="card card-pad">
-          <div className="section-title">Composição da força de trabalho</div>
+          <div className="section-head">
+            <div className="section-title">
+              <span className="section-icon"><PieChart size={17} strokeWidth={1.8} /></span>
+              Composição da força de trabalho
+            </div>
+            <ChevronRight size={16} className="section-chevron" />
+          </div>
           {hasComposicao ? (
             <ProportionBar segments={COMPOSICAO_SEGMENTS} />
           ) : (
@@ -329,7 +348,13 @@ export default function Dashboard() {
 
       <div className="grid grid-2" style={{ marginBottom: 22 }}>
         <div className="card card-pad">
-          <div className="section-title">Indicadores por filial</div>
+          <div className="section-head">
+            <div className="section-title">
+              <span className="section-icon"><BarChart3 size={17} strokeWidth={1.8} /></span>
+              Indicadores por filial
+            </div>
+            <ChevronRight size={16} className="section-chevron" />
+          </div>
           <DataTable
             columns={[
               { key: "filial", label: "Filial" },
@@ -351,7 +376,13 @@ export default function Dashboard() {
           />
         </div>
         <div className="card card-pad">
-          <div className="section-title">Indicadores por gestor</div>
+          <div className="section-head">
+            <div className="section-title">
+              <span className="section-icon"><Users2 size={17} strokeWidth={1.8} /></span>
+              Indicadores por gestor
+            </div>
+            <ChevronRight size={16} className="section-chevron" />
+          </div>
           <DataTable
             columns={[
               { key: "gestor", label: "Gestor" },
@@ -379,7 +410,13 @@ export default function Dashboard() {
 
       <div className="grid grid-2" style={{ marginBottom: 22 }}>
         <div className="card card-pad">
-          <div className="section-title">Férias programadas</div>
+          <div className="section-head">
+            <div className="section-title">
+              <span className="section-icon"><CalendarCheck size={17} strokeWidth={1.8} /></span>
+              Férias programadas
+            </div>
+            <ChevronRight size={16} className="section-chevron" />
+          </div>
           <DataTable
             columns={[
               { key: "colaborador", label: "Colaborador", render: (row) => colaboradorNome(row.colaboradorId) },
@@ -395,7 +432,13 @@ export default function Dashboard() {
           />
         </div>
         <div className="card card-pad">
-          <div className="section-title">Afastamentos ativos</div>
+          <div className="section-head">
+            <div className="section-title">
+              <span className="section-icon"><UserMinus size={17} strokeWidth={1.8} /></span>
+              Afastamentos ativos
+            </div>
+            <ChevronRight size={16} className="section-chevron" />
+          </div>
           <DataTable
             columns={[
               { key: "colaborador", label: "Colaborador", render: (row) => colaboradorNome(row.colaboradorId) },
@@ -422,7 +465,13 @@ export default function Dashboard() {
 
       <div className="grid grid-2">
         <div className="card card-pad">
-          <div className="section-title">Treinamentos e certificações</div>
+          <div className="section-head">
+            <div className="section-title">
+              <span className="section-icon"><GraduationCap size={17} strokeWidth={1.8} /></span>
+              Treinamentos e certificações
+            </div>
+            <ChevronRight size={16} className="section-chevron" />
+          </div>
           {hasTreinamentos ? (
             <ProportionBar segments={TREINAMENTOS_SEGMENTS} />
           ) : (
