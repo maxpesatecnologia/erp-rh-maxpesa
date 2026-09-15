@@ -21,10 +21,40 @@ const ESTADO_INICIAL = {
   cnhValidade: "",
   nrs: "",
   certificacoes: "",
+  equipamentos: "",
 };
 
-export default function NovoColaboradorForm({ onCriar, onCancelar }) {
-  const [dados, setDados] = useState(ESTADO_INICIAL);
+// Converte um colaborador já carregado (formato usado pelas telas, com cnh
+// como objeto e nrs/certificacoes como array) de volta pro formato plano do
+// formulário — usado para pré-preencher a edição.
+function paraFormulario(colaborador) {
+  if (!colaborador) return ESTADO_INICIAL;
+  return {
+    nome: colaborador.nome || "",
+    codigoDominio: colaborador.codigoDominio || "",
+    foto: colaborador.foto || null,
+    cargo: colaborador.cargo || "",
+    departamento: colaborador.departamento || "",
+    filial: colaborador.filial || "",
+    centroCusto: colaborador.centroCusto || "",
+    gestor: colaborador.gestor || "",
+    equipe: colaborador.equipe || "",
+    admissao: colaborador.admissao || "",
+    escolaridade: colaborador.escolaridade || "",
+    dependentes: colaborador.dependentes || 0,
+    cnhCategoria: colaborador.cnh?.categoria || "",
+    cnhValidade: colaborador.cnh?.validade || "",
+    nrs: (colaborador.nrs || []).join(", "),
+    certificacoes: (colaborador.certificacoes || []).join(", "),
+    equipamentos: (colaborador.equipamentos || []).join(", "),
+  };
+}
+
+// `colaborador` presente = modo edição (pré-preenche e chama onSalvar com os
+// dados atualizados); ausente = cadastro novo.
+export default function NovoColaboradorForm({ colaborador, onSalvar, onCancelar }) {
+  const editando = Boolean(colaborador);
+  const [dados, setDados] = useState(() => paraFormulario(colaborador));
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -50,7 +80,7 @@ export default function NovoColaboradorForm({ onCriar, onCancelar }) {
     setErro("");
     setSalvando(true);
     try {
-      await onCriar({ ...dados, dependentes: Number(dados.dependentes) || 0 });
+      await onSalvar({ ...dados, dependentes: Number(dados.dependentes) || 0 });
     } catch (err) {
       setErro(err.message || "Erro ao salvar colaborador.");
     } finally {
@@ -60,11 +90,13 @@ export default function NovoColaboradorForm({ onCriar, onCancelar }) {
 
   return (
     <div className="card card-pad" style={{ marginBottom: 18 }}>
-      <div className="section-title">Novo colaborador</div>
+      <div className="section-title">{editando ? `Editar colaborador — ${colaborador.nome}` : "Novo colaborador"}</div>
       <div style={{ fontSize: 12.5, color: "var(--color-text-muted)", marginBottom: 14 }}>
         {isSupabaseConfigured
-          ? "Cadastro gravado direto na base de dados."
-          : "Modo demonstração (sem Supabase configurado): cadastro salvo apenas nesta sessão, some ao recarregar a página."}
+          ? editando
+            ? "Alterações gravadas direto na base de dados."
+            : "Cadastro gravado direto na base de dados."
+          : "Modo demonstração (sem Supabase configurado): alteração salva apenas nesta sessão, some ao recarregar a página."}
       </div>
 
       {erro && <div className="login-error" style={{ marginBottom: 14 }}>{erro}</div>}
@@ -151,11 +183,20 @@ export default function NovoColaboradorForm({ onCriar, onCancelar }) {
             <label htmlFor="certificacoes">Certificações (separadas por vírgula)</label>
             <input id="certificacoes" value={dados.certificacoes} onChange={(e) => atualizar("certificacoes", e.target.value)} />
           </div>
+          <div className="field-group" style={{ gridColumn: "span 3" }}>
+            <label htmlFor="equipamentos">Equipamentos que opera (separados por vírgula)</label>
+            <input
+              id="equipamentos"
+              value={dados.equipamentos}
+              onChange={(e) => atualizar("equipamentos", e.target.value)}
+              placeholder="ex: Escavadeira, Retroescavadeira, Munck"
+            />
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
           <button type="submit" className="btn btn-primary" disabled={salvando}>
-            {salvando ? "Salvando…" : "Salvar colaborador"}
+            {salvando ? "Salvando…" : editando ? "Salvar alterações" : "Salvar colaborador"}
           </button>
           <button type="button" className="btn btn-outline" onClick={onCancelar} disabled={salvando}>
             Cancelar

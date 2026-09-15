@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Moon, Sun, LogOut, KeyRound } from "lucide-react";
+import { Moon, Sun, LogOut, KeyRound, Menu } from "lucide-react";
 import { ROLE_LABELS } from "../config/modules";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import TrocarSenhaModal from "./TrocarSenhaModal";
 
-export default function Topbar() {
+export default function Topbar({ onMenuClick }) {
   const { user, signOut, isSupabaseConfigured } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -28,7 +28,12 @@ export default function Topbar() {
 
   return (
     <header className="topbar">
-      <div className="topbar-title">Sistema de Gestão de RH</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+        <button className="icon-btn menu-toggle" onClick={onMenuClick} aria-label="Abrir menu">
+          <Menu size={16} />
+        </button>
+        <div className="topbar-title">Sistema de Gestão de RH</div>
+      </div>
       <div className="topbar-right">
         {user && (
           <div className="user-chip" title={`${user.nome} · ${ROLE_LABELS[user.role] ?? user.role} · ${user.filial}`}>
@@ -46,7 +51,7 @@ export default function Topbar() {
             title="Trocar senha"
             aria-label="Trocar senha"
           >
-            <KeyRound size={17} />
+            <KeyRound size={15} />
           </button>
         )}
         <button
@@ -55,10 +60,10 @@ export default function Topbar() {
           title={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
           aria-label="Alternar tema"
         >
-          {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+          {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
         </button>
         <button className="icon-btn icon-btn-danger" onClick={handleLogout} title="Sair" aria-label="Sair">
-          <LogOut size={17} />
+          <LogOut size={15} />
         </button>
       </div>
 

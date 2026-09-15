@@ -4,12 +4,12 @@ import { NAV_SECTIONS } from "../config/modules";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
-export default function Sidebar() {
+export default function Sidebar({ open, onNavigate }) {
   const { user } = useAuth();
   const { theme } = useTheme();
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${open ? "open" : ""}`}>
       <div className="sidebar-brand">
         <img
           className="sidebar-brand-logo"
@@ -38,6 +38,7 @@ export default function Sidebar() {
               <NavLink
                 to={item.path}
                 key={item.path}
+                onClick={onNavigate}
                 className={({ isActive }) => "sidebar-link" + (isActive ? " active" : "")}
               >
                 <span className="icon"><Icon size={16} /></span>

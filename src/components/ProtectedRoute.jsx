@@ -3,13 +3,14 @@ import { Lock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { canAccess } from "../config/modules";
 import Layout from "./Layout";
+import AppLoading from "./AppLoading";
 
 export default function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return <div style={{ padding: 40 }}>Carregando…</div>;
+    return <AppLoading />;
   }
 
   if (!user) {

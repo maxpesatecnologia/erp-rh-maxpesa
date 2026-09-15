@@ -1,65 +1,23 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  UserPen,
-  Palmtree,
-  CalendarDays,
-  Timer,
-  PenLine,
-  Upload,
-  GraduationCap,
-  Megaphone,
-  LifeBuoy,
-  Bot,
-} from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
-import DadosCadastraisPanel from "./panels/DadosCadastraisPanel";
-import SolicitarFeriasPanel from "./panels/SolicitarFeriasPanel";
-import SaldoFeriasPanel from "./panels/SaldoFeriasPanel";
-import BancoHorasPanel from "./panels/BancoHorasPanel";
-import AssinarDocumentosPanel from "./panels/AssinarDocumentosPanel";
-import EnviarDocumentosPanel from "./panels/EnviarDocumentosPanel";
-import TreinamentosPanel from "./panels/TreinamentosPanel";
-import ComunicadosPanel from "./panels/ComunicadosPanel";
-import SolicitacaoRHPanel from "./panels/SolicitacaoRHPanel";
+import { UserPen, GraduationCap, Megaphone, Bot } from "lucide-react";
 
 const ACOES = [
-  { id: "dados", icon: UserPen, titulo: "Atualizar dados cadastrais", desc: "Endereço, contato de emergência, dados bancários.", panel: DadosCadastraisPanel },
-  { id: "solicitar-ferias", icon: Palmtree, titulo: "Solicitar férias", desc: "Envie um pedido de férias para aprovação do gestor.", panel: SolicitarFeriasPanel },
-  { id: "saldo-ferias", icon: CalendarDays, titulo: "Consultar saldo de férias", desc: "Sincronizado com o Domínio Sistemas.", panel: SaldoFeriasPanel },
-  { id: "banco-horas", icon: Timer, titulo: "Consultar banco de horas", desc: "Extrato de horas extras e compensações.", panel: BancoHorasPanel },
-  { id: "assinar-docs", icon: PenLine, titulo: "Assinar documentos", desc: "Documentos pendentes de assinatura eletrônica.", panel: AssinarDocumentosPanel },
-  { id: "enviar-docs", icon: Upload, titulo: "Enviar documentos", desc: "Upload de atestados, comprovantes e certificados.", panel: EnviarDocumentosPanel },
-  { id: "treinamentos", icon: GraduationCap, titulo: "Fazer treinamentos", desc: "Cursos e reciclagens de NR pendentes.", panel: TreinamentosPanel },
-  { id: "comunicados", icon: Megaphone, titulo: "Consultar comunicados", desc: "Mural, notícias e avisos do RH.", panel: ComunicadosPanel },
-  { id: "chamado-rh", icon: LifeBuoy, titulo: "Abrir solicitação ao RH", desc: "Dúvidas, declarações e pedidos administrativos.", panel: SolicitacaoRHPanel },
+  { id: "dados", icon: UserPen, titulo: "Atualizar dados de colaborador", desc: "Abre o Cadastro de Colaboradores para editar dados, contato e informações bancárias.", path: "/colaboradores" },
+  { id: "treinamentos", icon: GraduationCap, titulo: "Treinamentos e NRs", desc: "Cursos, reciclagens e validade de treinamentos.", path: "/treinamentos" },
+  { id: "comunicados", icon: Megaphone, titulo: "Comunicação interna", desc: "Mural, avisos, aniversariantes e enquetes do RH.", path: "/comunicacao" },
   { id: "ia", icon: Bot, titulo: "Conversar com a IA", desc: "Pergunte sobre validade de NR, ASO, treinamentos e mais.", path: "/ia" },
 ];
 
 export default function PortalColaborador() {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const [selecionada, setSelecionada] = useState(null);
-  const [painelAberto, setPainelAberto] = useState(false);
-
-  function abrirAcao(acao) {
-    if (acao.path) {
-      navigate(acao.path);
-      return;
-    }
-    setSelecionada(acao);
-    setPainelAberto(true);
-  }
-
-  const PanelComponent = selecionada?.panel;
 
   return (
     <div>
       <div className="page-header">
         <div>
-          <h1>Portal do Colaborador</h1>
+          <h1>Acesso Rápido</h1>
           <div className="page-subtitle">
-            Olá, {user?.nome ?? "colaborador"} — aqui estão os serviços disponíveis para você.
+            Atalhos para as tarefas mais comuns do dia a dia com colaboradores.
           </div>
         </div>
       </div>
@@ -67,12 +25,11 @@ export default function PortalColaborador() {
       <div className="grid grid-3">
         {ACOES.map((acao) => {
           const Icon = acao.icon;
-          const ativo = selecionada?.id === acao.id && painelAberto;
           return (
             <div
-              className={`card card-pad action-card ${ativo ? "action-card-active" : ""}`}
+              className="card card-pad action-card"
               key={acao.id}
-              onClick={() => abrirAcao(acao)}
+              onClick={() => navigate(acao.path)}
             >
               <div className="action-icon">
                 <Icon size={22} />
@@ -82,21 +39,6 @@ export default function PortalColaborador() {
             </div>
           );
         })}
-      </div>
-
-      <div className={`collapse ${painelAberto ? "open" : ""}`}>
-        <div className="collapse-inner">
-          {PanelComponent && (
-            <div className="card card-pad collapse-content" style={{ marginTop: 20 }} key={selecionada.id}>
-              <PanelComponent />
-              <div className="panel-actions" style={{ marginTop: 18, borderTop: "1px solid var(--color-border)", paddingTop: 14 }}>
-                <button className="btn btn-outline" onClick={() => setPainelAberto(false)}>
-                  Fechar
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

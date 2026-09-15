@@ -267,7 +267,7 @@ export default function Dashboard() {
         <div className="card card-pad">
           <div className="section-head">
             <div className="section-title">
-              <span className="section-icon"><Users size={17} strokeWidth={1.8} /></span>
+              <span className="section-icon"><Users size={15} strokeWidth={1.8} /></span>
               Evolução do headcount
             </div>
             <div className="section-hint"><Calendar size={12} strokeWidth={1.8} /> últimos 12 meses</div>
@@ -290,10 +290,10 @@ export default function Dashboard() {
         <div className="card card-pad">
           <div className="section-head">
             <div className="section-title">
-              <span className="section-icon"><TrendingDown size={17} strokeWidth={1.8} /></span>
+              <span className="section-icon"><TrendingDown size={15} strokeWidth={1.8} /></span>
               Turnover x Absenteísmo
             </div>
-            <div className="section-hint"><Calendar size={12} strokeWidth={1.8} /> últimos 12 meses · absenteísmo ainda é estimado (sem integração com relógio de ponto)</div>
+            <div className="section-hint"><Calendar size={12} strokeWidth={1.8} /> últimos 12 meses</div>
           </div>
           {hasColaboradores ? (
             <TrendChart
@@ -309,7 +309,7 @@ export default function Dashboard() {
             <EmptyState
               icon={TrendingDown}
               title="Sem histórico de turnover"
-              hint="Turnover é calculado a partir da base de colaboradores; absenteísmo depende da integração futura com o relógio de ponto."
+              hint="Turnover é calculado a partir da base de colaboradores."
             />
           )}
         </div>
@@ -319,7 +319,7 @@ export default function Dashboard() {
         <div className="card card-pad">
           <div className="section-head">
             <div className="section-title">
-              <span className="section-icon"><Building2 size={17} strokeWidth={1.8} /></span>
+              <span className="section-icon"><Building2 size={15} strokeWidth={1.8} /></span>
               Headcount por filial
             </div>
             <ChevronRight size={16} className="section-chevron" />
@@ -333,7 +333,7 @@ export default function Dashboard() {
         <div className="card card-pad">
           <div className="section-head">
             <div className="section-title">
-              <span className="section-icon"><PieChart size={17} strokeWidth={1.8} /></span>
+              <span className="section-icon"><PieChart size={15} strokeWidth={1.8} /></span>
               Composição da força de trabalho
             </div>
             <ChevronRight size={16} className="section-chevron" />
@@ -350,7 +350,7 @@ export default function Dashboard() {
         <div className="card card-pad">
           <div className="section-head">
             <div className="section-title">
-              <span className="section-icon"><BarChart3 size={17} strokeWidth={1.8} /></span>
+              <span className="section-icon"><BarChart3 size={15} strokeWidth={1.8} /></span>
               Indicadores por filial
             </div>
             <ChevronRight size={16} className="section-chevron" />
@@ -378,7 +378,7 @@ export default function Dashboard() {
         <div className="card card-pad">
           <div className="section-head">
             <div className="section-title">
-              <span className="section-icon"><Users2 size={17} strokeWidth={1.8} /></span>
+              <span className="section-icon"><Users2 size={15} strokeWidth={1.8} /></span>
               Indicadores por gestor
             </div>
             <ChevronRight size={16} className="section-chevron" />
@@ -412,7 +412,7 @@ export default function Dashboard() {
         <div className="card card-pad">
           <div className="section-head">
             <div className="section-title">
-              <span className="section-icon"><CalendarCheck size={17} strokeWidth={1.8} /></span>
+              <span className="section-icon"><CalendarCheck size={15} strokeWidth={1.8} /></span>
               Férias programadas
             </div>
             <ChevronRight size={16} className="section-chevron" />
@@ -434,7 +434,7 @@ export default function Dashboard() {
         <div className="card card-pad">
           <div className="section-head">
             <div className="section-title">
-              <span className="section-icon"><UserMinus size={17} strokeWidth={1.8} /></span>
+              <span className="section-icon"><UserMinus size={15} strokeWidth={1.8} /></span>
               Afastamentos ativos
             </div>
             <ChevronRight size={16} className="section-chevron" />
@@ -467,7 +467,7 @@ export default function Dashboard() {
         <div className="card card-pad">
           <div className="section-head">
             <div className="section-title">
-              <span className="section-icon"><GraduationCap size={17} strokeWidth={1.8} /></span>
+              <span className="section-icon"><GraduationCap size={15} strokeWidth={1.8} /></span>
               Treinamentos e certificações
             </div>
             <ChevronRight size={16} className="section-chevron" />

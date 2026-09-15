@@ -10,10 +10,10 @@ export default function DataTable({ columns, rows, rowKey = "id", isRowBlocked }
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row, rowIndex) => (
             <tr key={row[rowKey]} className={isRowBlocked?.(row) ? "blocked-row" : ""}>
               {columns.map((col) => (
-                <td key={col.key}>{col.render ? col.render(row) : row[col.key]}</td>
+                <td key={col.key}>{col.render ? col.render(row, rowIndex) : row[col.key]}</td>
               ))}
             </tr>
           ))}

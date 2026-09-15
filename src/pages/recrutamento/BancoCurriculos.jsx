@@ -1,7 +1,17 @@
-import { useRef, useState } from "react";
-import { Plus, Folder, FolderOpen, UploadCloud, FileText, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Plus, Folder, FolderOpen, UploadCloud, FileText, Download, Trash2, X } from "lucide-react";
 import { PASTAS_CARGOS } from "../../data/mock/bancoCurriculos";
 import { formatDate } from "../../utils/format";
+import { isSupabaseConfigured } from "../../lib/supabaseClient";
+import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
+import {
+  listarPastas,
+  criarPasta as criarPastaRemota,
+  excluirPasta as excluirPastaRemota,
+  importarCurriculos as importarCurriculosRemoto,
+  removerCurriculo as removerCurriculoRemoto,
+  obterUrlCurriculo,
+} from "../../lib/bancoCurriculosApi";
 
 function proximoId(prefixo, lista) {
   const maiorNumero = lista.reduce((max, item) => {
@@ -12,65 +22,156 @@ function proximoId(prefixo, lista) {
 }
 
 export default function BancoCurriculos() {
-  const [pastas, setPastas] = useState(PASTAS_CARGOS);
+  const [pastas, setPastas] = useState(isSupabaseConfigured ? [] : PASTAS_CARGOS);
+  const [carregando, setCarregando] = useState(isSupabaseConfigured);
+  const [erroCarregamento, setErroCarregamento] = useState("");
   const [pastaSelecionadaId, setPastaSelecionadaId] = useState(null);
   const [novaPastaAberta, setNovaPastaAberta] = useState(false);
   const [novoCargo, setNovoCargo] = useState("");
+  const [criandoPasta, setCriandoPasta] = useState(false);
+  const [erroPasta, setErroPasta] = useState("");
+  const [pastaParaExcluir, setPastaParaExcluir] = useState(null);
+  const [excluindoPasta, setExcluindoPasta] = useState(false);
+  const [erroExclusao, setErroExclusao] = useState("");
+  const [importando, setImportando] = useState(false);
+  const [erroImportacao, setErroImportacao] = useState("");
+  const [erroAcaoCv, setErroAcaoCv] = useState("");
   const inputImportRef = useRef(null);
 
   const pastaSelecionada = pastas.find((p) => p.id === pastaSelecionadaId) ?? null;
 
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    listarPastas()
+      .then(setPastas)
+      .catch((erro) => setErroCarregamento(erro.message))
+      .finally(() => setCarregando(false));
+  }, []);
+
   function abrirPasta(pasta) {
+    setErroImportacao("");
+    setErroAcaoCv("");
     setPastaSelecionadaId((atual) => (atual === pasta.id ? null : pasta.id));
   }
 
-  function criarPasta(e) {
+  async function criarPasta(e) {
     e.preventDefault();
     const cargo = novoCargo.trim();
     if (!cargo) return;
-    const nova = { id: proximoId("cargo", pastas), cargo, curriculos: [] };
-    setPastas((atual) => [...atual, nova]);
-    setPastaSelecionadaId(nova.id);
-    setNovoCargo("");
-    setNovaPastaAberta(false);
+    setCriandoPasta(true);
+    setErroPasta("");
+    try {
+      if (isSupabaseConfigured) {
+        const nova = await criarPastaRemota(cargo);
+        setPastas((atual) => [nova, ...atual]);
+        setPastaSelecionadaId(nova.id);
+      } else {
+        const nova = { id: proximoId("cargo", pastas), cargo, curriculos: [] };
+        setPastas((atual) => [...atual, nova]);
+        setPastaSelecionadaId(nova.id);
+      }
+      setNovoCargo("");
+      setNovaPastaAberta(false);
+    } catch (erro) {
+      setErroPasta(erro.message || "Erro ao criar pasta.");
+    } finally {
+      setCriandoPasta(false);
+    }
   }
 
-  function excluirPasta(pastaId) {
-    setPastas((atual) => atual.filter((p) => p.id !== pastaId));
-    setPastaSelecionadaId((atual) => (atual === pastaId ? null : atual));
+  function pedirExclusaoPasta(pasta) {
+    setErroExclusao("");
+    setPastaParaExcluir(pasta);
   }
 
-  function importarCurriculos(e) {
+  function fecharModalExclusaoPasta() {
+    if (excluindoPasta) return;
+    setPastaParaExcluir(null);
+    setErroExclusao("");
+  }
+
+  async function confirmarExclusaoPasta() {
+    const pasta = pastaParaExcluir;
+    if (!pasta) return;
+    setExcluindoPasta(true);
+    setErroExclusao("");
+    try {
+      if (isSupabaseConfigured) {
+        await excluirPastaRemota(pasta.id);
+      }
+      setPastas((atual) => atual.filter((p) => p.id !== pasta.id));
+      setPastaSelecionadaId((atual) => (atual === pasta.id ? null : atual));
+      setPastaParaExcluir(null);
+    } catch (erro) {
+      setErroExclusao(erro.message || "Erro ao excluir pasta.");
+    } finally {
+      setExcluindoPasta(false);
+    }
+  }
+
+  async function importarCurriculos(e) {
     const arquivos = Array.from(e.target.files ?? []);
     if (arquivos.length === 0 || !pastaSelecionadaId) return;
-    setPastas((atual) =>
-      atual.map((p) => {
-        if (p.id !== pastaSelecionadaId) return p;
-        let proximoNumero = Number(proximoId("cv", p.curriculos).replace(/\D/g, ""));
-        const novos = arquivos.map((arquivo) => {
-          const cv = {
-            id: `cv-${proximoNumero}`,
-            nome: arquivo.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "),
-            arquivoNome: arquivo.name,
-            enviadoEm: new Date().toISOString().slice(0, 10),
-            origem: "Upload manual",
-          };
-          proximoNumero += 1;
-          return cv;
-        });
-        return { ...p, curriculos: [...novos, ...p.curriculos] };
-      })
-    );
-    if (inputImportRef.current) inputImportRef.current.value = "";
+    setErroImportacao("");
+    setImportando(true);
+    try {
+      if (isSupabaseConfigured) {
+        const novos = await importarCurriculosRemoto(pastaSelecionadaId, arquivos);
+        setPastas((atual) =>
+          atual.map((p) => (p.id === pastaSelecionadaId ? { ...p, curriculos: [...novos, ...p.curriculos] } : p))
+        );
+      } else {
+        setPastas((atual) =>
+          atual.map((p) => {
+            if (p.id !== pastaSelecionadaId) return p;
+            let proximoNumero = Number(proximoId("cv", p.curriculos).replace(/\D/g, ""));
+            const novos = arquivos.map((arquivo) => {
+              const cv = {
+                id: `cv-${proximoNumero}`,
+                nome: arquivo.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " "),
+                arquivoNome: arquivo.name,
+                enviadoEm: new Date().toISOString().slice(0, 10),
+                origem: "Upload manual",
+              };
+              proximoNumero += 1;
+              return cv;
+            });
+            return { ...p, curriculos: [...novos, ...p.curriculos] };
+          })
+        );
+      }
+    } catch (erro) {
+      setErroImportacao(erro.message || "Erro ao importar currículos.");
+    } finally {
+      setImportando(false);
+      if (inputImportRef.current) inputImportRef.current.value = "";
+    }
   }
 
-  function removerCurriculo(cvId) {
-    if (!pastaSelecionadaId) return;
-    setPastas((atual) =>
-      atual.map((p) =>
-        p.id === pastaSelecionadaId ? { ...p, curriculos: p.curriculos.filter((c) => c.id !== cvId) } : p
-      )
-    );
+  async function removerCurriculo(cv) {
+    setErroAcaoCv("");
+    try {
+      if (isSupabaseConfigured) {
+        await removerCurriculoRemoto(cv);
+      }
+      setPastas((atual) =>
+        atual.map((p) =>
+          p.id === pastaSelecionadaId ? { ...p, curriculos: p.curriculos.filter((c) => c.id !== cv.id) } : p
+        )
+      );
+    } catch (erro) {
+      setErroAcaoCv(erro.message || "Erro ao remover currículo.");
+    }
+  }
+
+  async function abrirCurriculo(cv) {
+    setErroAcaoCv("");
+    try {
+      const url = await obterUrlCurriculo(cv);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (erro) {
+      setErroAcaoCv(erro.message || "Erro ao abrir currículo.");
+    }
   }
 
   return (
@@ -96,6 +197,7 @@ export default function BancoCurriculos() {
           <div className="collapse-content">
             <form className="card card-pad" style={{ marginBottom: 18 }} onSubmit={criarPasta}>
               <div className="section-title">Nova pasta de cargo</div>
+              {erroPasta && <div className="login-error" style={{ marginBottom: 12 }}>{erroPasta}</div>}
               <div className="form-grid">
                 <div className="field-group">
                   <label>Nome do cargo</label>
@@ -108,10 +210,10 @@ export default function BancoCurriculos() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-                <button type="submit" className="btn btn-primary" disabled={!novoCargo.trim()}>
-                  Criar pasta
+                <button type="submit" className="btn btn-primary" disabled={!novoCargo.trim() || criandoPasta}>
+                  {criandoPasta ? "Criando…" : "Criar pasta"}
                 </button>
-                <button type="button" className="btn btn-outline" onClick={() => setNovaPastaAberta(false)}>
+                <button type="button" className="btn btn-outline" onClick={() => setNovaPastaAberta(false)} disabled={criandoPasta}>
                   Cancelar
                 </button>
               </div>
@@ -120,7 +222,13 @@ export default function BancoCurriculos() {
         </div>
       </div>
 
-      {pastas.length === 0 ? (
+      {erroCarregamento && <div className="login-error" style={{ marginBottom: 14 }}>{erroCarregamento}</div>}
+
+      {carregando ? (
+        <div className="card card-pad" style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+          Carregando pastas…
+        </div>
+      ) : pastas.length === 0 ? (
         <div className="card card-pad" style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
           Nenhuma pasta de cargo criada ainda. Clique em "Nova pasta de cargo" para começar.
         </div>
@@ -157,7 +265,7 @@ export default function BancoCurriculos() {
                   Currículos — {pastaSelecionada.cargo}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <button className="btn btn-outline" onClick={() => excluirPasta(pastaSelecionada.id)}>
+                  <button className="btn btn-outline" onClick={() => pedirExclusaoPasta(pastaSelecionada)}>
                     <Trash2 size={14} /> Excluir pasta
                   </button>
                   <button className="icon-btn" aria-label="Fechar pasta" onClick={() => setPastaSelecionadaId(null)}>
@@ -166,13 +274,21 @@ export default function BancoCurriculos() {
                 </div>
               </div>
               <div className="section-hint" style={{ marginBottom: 14 }}>
-                Importação salva apenas nesta sessão (protótipo) — some ao recarregar a página. Em produção, os
-                arquivos são gravados direto na pasta correspondente no SharePoint.
+                {isSupabaseConfigured
+                  ? "Os arquivos ficam armazenados no Supabase Storage, vinculados a esta pasta."
+                  : "Importação salva apenas nesta sessão (protótipo) — some ao recarregar a página. Configure o Supabase para gravar de verdade (ver README)."}
               </div>
+
+              {erroImportacao && <div className="login-error" style={{ marginBottom: 14 }}>{erroImportacao}</div>}
+              {erroAcaoCv && <div className="login-error" style={{ marginBottom: 14 }}>{erroAcaoCv}</div>}
 
               <label className="upload-drop" htmlFor="import-curriculos-input">
                 <UploadCloud size={22} />
-                <span>Clique para importar currículos (PDF, DOC ou DOCX) — pode selecionar vários de uma vez</span>
+                <span>
+                  {importando
+                    ? "Enviando currículos…"
+                    : "Clique para importar currículos (PDF, DOC ou DOCX, até 50 MB cada) — pode selecionar vários de uma vez"}
+                </span>
                 <input
                   id="import-curriculos-input"
                   ref={inputImportRef}
@@ -180,6 +296,7 @@ export default function BancoCurriculos() {
                   multiple
                   accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   onChange={importarCurriculos}
+                  disabled={importando}
                   style={{ display: "none" }}
                 />
               </label>
@@ -203,10 +320,19 @@ export default function BancoCurriculos() {
                             {cv.arquivoNome} · {cv.origem} · recebido em {formatDate(cv.enviadoEm)}
                           </div>
                         </div>
+                        {isSupabaseConfigured && (
+                          <button
+                            className="icon-btn"
+                            aria-label={`Abrir currículo de ${cv.nome}`}
+                            onClick={() => abrirCurriculo(cv)}
+                          >
+                            <Download size={14} />
+                          </button>
+                        )}
                         <button
                           className="icon-btn"
                           aria-label={`Remover currículo de ${cv.nome}`}
-                          onClick={() => removerCurriculo(cv.id)}
+                          onClick={() => removerCurriculo(cv)}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -219,6 +345,17 @@ export default function BancoCurriculos() {
           )}
         </div>
       </div>
+
+      {pastaParaExcluir && (
+        <ConfirmDeleteModal
+          titulo="Excluir pasta de cargo"
+          mensagem={`Tem certeza que deseja excluir a pasta "${pastaParaExcluir.cargo}"? Todos os currículos importados nela (${pastaParaExcluir.curriculos.length}) serão excluídos junto. Essa ação não pode ser desfeita.`}
+          confirmando={excluindoPasta}
+          erro={erroExclusao}
+          onConfirmar={confirmarExclusaoPasta}
+          onCancelar={fecharModalExclusaoPasta}
+        />
+      )}
     </div>
   );
 }

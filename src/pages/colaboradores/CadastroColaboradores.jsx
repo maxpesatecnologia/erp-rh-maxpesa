@@ -1,17 +1,24 @@
-import { useEffect, useState } from "react";
-import { Plus, Upload, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Search, Upload, X } from "lucide-react";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import Avatar from "../../components/Avatar";
 import NovoColaboradorForm from "./NovoColaboradorForm";
 import ImportarColaboradoresForm from "./ImportarColaboradoresForm";
+import IniciarDesligamentoModal from "./IniciarDesligamentoModal";
+import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
 import { COLABORADORES } from "../../data/mock/colaboradores";
 import { isSupabaseConfigured } from "../../lib/supabaseClient";
 import {
   listarColaboradores,
   criarColaborador as criarColaboradorRemoto,
+  atualizarColaborador as atualizarColaboradorRemoto,
+  atualizarStatusColaborador,
+  excluirColaborador as excluirColaboradorRemoto,
   importarColaboradores as importarColaboradoresRemoto,
 } from "../../lib/colaboradoresApi";
+import { criarDesligamento } from "../../lib/desligamentoApi";
 
 function proximaMatricula(lista) {
   const maiorNumero = lista.reduce((max, c) => {
@@ -32,19 +39,39 @@ function criarColaborador(novo, id) {
     cnh: novo.cnhCategoria ? { categoria: novo.cnhCategoria, validade: novo.cnhValidade } : null,
     nrs: novo.nrs ? novo.nrs.split(",").map((s) => s.trim()).filter(Boolean) : [],
     certificacoes: novo.certificacoes ? novo.certificacoes.split(",").map((s) => s.trim()).filter(Boolean) : [],
+    equipamentos: novo.equipamentos ? novo.equipamentos.split(",").map((s) => s.trim()).filter(Boolean) : [],
   };
 }
 
 export default function CadastroColaboradores() {
+  const navigate = useNavigate();
   const [colaboradores, setColaboradores] = useState(isSupabaseConfigured ? [] : COLABORADORES);
   const [carregando, setCarregando] = useState(isSupabaseConfigured);
   const [erroCarregamento, setErroCarregamento] = useState("");
   const [selected, setSelected] = useState(null);
   const [timelineAberta, setTimelineAberta] = useState(false);
+  const [timelineTop, setTimelineTop] = useState(0);
+  const cardRef = useRef(null);
   const [formAberto, setFormAberto] = useState(false);
   const [formVisitado, setFormVisitado] = useState(false);
+  const [colaboradorEditando, setColaboradorEditando] = useState(null);
   const [importAberto, setImportAberto] = useState(false);
   const [importVisitado, setImportVisitado] = useState(false);
+  const [colaboradorParaExcluir, setColaboradorParaExcluir] = useState(null);
+  const [excluindo, setExcluindo] = useState(false);
+  const [erroExclusao, setErroExclusao] = useState("");
+  const [colaboradorDesligando, setColaboradorDesligando] = useState(null);
+  const [salvandoDesligamento, setSalvandoDesligamento] = useState(false);
+  const [erroDesligamento, setErroDesligamento] = useState("");
+  const [busca, setBusca] = useState("");
+
+  const colaboradoresFiltrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return colaboradores;
+    return colaboradores.filter((c) =>
+      [c.nome, c.cargo, c.codigoDominio, c.id].some((campo) => String(campo || "").toLowerCase().includes(termo))
+    );
+  }, [colaboradores, busca]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -54,25 +81,126 @@ export default function CadastroColaboradores() {
       .finally(() => setCarregando(false));
   }, []);
 
-  function handleVerTimeline(colaborador) {
+  function handleVerTimeline(colaborador, event) {
     if (selected?.id === colaborador.id && timelineAberta) {
       setTimelineAberta(false);
-    } else {
-      setSelected(colaborador);
-      setTimelineAberta(true);
+      return;
+    }
+    const rowEl = event.currentTarget.closest("tr");
+    if (rowEl && cardRef.current) {
+      const rowRect = rowEl.getBoundingClientRect();
+      const cardRect = cardRef.current.getBoundingClientRect();
+      setTimelineTop(rowRect.bottom - cardRect.top + 8);
+    }
+    setSelected(colaborador);
+    setTimelineAberta(true);
+  }
+
+  function fecharForm() {
+    setFormAberto(false);
+    setColaboradorEditando(null);
+  }
+
+  function handleEditar(colaborador) {
+    setColaboradorEditando(colaborador);
+    setFormVisitado(true);
+    setFormAberto(true);
+  }
+
+  async function handleSalvar(dados) {
+    if (colaboradorEditando) {
+      if (isSupabaseConfigured) {
+        const atualizado = await atualizarColaboradorRemoto(colaboradorEditando.id, dados);
+        setColaboradores((atual) => atual.map((c) => (c.id === atualizado.id ? atualizado : c)));
+      } else {
+        setColaboradores((atual) =>
+          atual.map((c) => (c.id === colaboradorEditando.id ? criarColaborador(dados, colaboradorEditando.id) : c))
+        );
+      }
+      fecharForm();
+      return;
+    }
+    if (isSupabaseConfigured) {
+      const colaborador = await criarColaboradorRemoto(dados);
+      setColaboradores((atual) => [colaborador, ...atual]);
+      fecharForm();
+      return;
+    }
+    const colaborador = criarColaborador(dados, proximaMatricula(colaboradores));
+    setColaboradores((atual) => [colaborador, ...atual]);
+    fecharForm();
+  }
+
+  function handleExcluir(colaborador) {
+    setErroExclusao("");
+    setColaboradorParaExcluir(colaborador);
+  }
+
+  function fecharModalExclusao() {
+    if (excluindo) return;
+    setColaboradorParaExcluir(null);
+    setErroExclusao("");
+  }
+
+  async function confirmarExclusao() {
+    const colaborador = colaboradorParaExcluir;
+    if (!colaborador) return;
+    setExcluindo(true);
+    setErroExclusao("");
+    try {
+      if (isSupabaseConfigured) {
+        await excluirColaboradorRemoto(colaborador.id);
+      }
+      setColaboradores((atual) => atual.filter((c) => c.id !== colaborador.id));
+      if (selected?.id === colaborador.id) {
+        setSelected(null);
+        setTimelineAberta(false);
+      }
+      if (colaboradorEditando?.id === colaborador.id) {
+        fecharForm();
+      }
+      setColaboradorParaExcluir(null);
+    } catch (erro) {
+      setErroExclusao(erro.message || "Erro ao excluir colaborador.");
+    } finally {
+      setExcluindo(false);
     }
   }
 
-  async function handleCriar(novo) {
-    if (isSupabaseConfigured) {
-      const colaborador = await criarColaboradorRemoto(novo);
-      setColaboradores((atual) => [colaborador, ...atual]);
-      setFormAberto(false);
-      return;
+  function handleDesligar(colaborador) {
+    setErroDesligamento("");
+    setColaboradorDesligando(colaborador);
+  }
+
+  function fecharModalDesligamento() {
+    if (salvandoDesligamento) return;
+    setColaboradorDesligando(null);
+    setErroDesligamento("");
+  }
+
+  async function handleConfirmarDesligamento(dados) {
+    if (!colaboradorDesligando) return;
+    setSalvandoDesligamento(true);
+    setErroDesligamento("");
+    try {
+      await criarDesligamento({
+        colaboradorId: colaboradorDesligando.id,
+        motivo: dados.motivo,
+        dataDesligamento: dados.dataDesligamento,
+      });
+      if (isSupabaseConfigured) {
+        await atualizarStatusColaborador(colaboradorDesligando.id, "Desligado");
+      }
+      setColaboradores((atual) =>
+        atual.map((c) => (c.id === colaboradorDesligando.id ? { ...c, status: "Desligado" } : c))
+      );
+      setColaboradorDesligando(null);
+      navigate("/desligamento");
+    } catch (erro) {
+      setErroDesligamento(erro.message || "Erro ao iniciar desligamento.");
+    } finally {
+      setSalvandoDesligamento(false);
     }
-    const colaborador = criarColaborador(novo, proximaMatricula(colaboradores));
-    setColaboradores((atual) => [colaborador, ...atual]);
-    setFormAberto(false);
   }
 
   async function handleImportarEmMassa(linhas) {
@@ -116,6 +244,7 @@ export default function CadastroColaboradores() {
             className="btn btn-primary"
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             onClick={() => {
+              setColaboradorEditando(null);
               setFormVisitado(true);
               setFormAberto((v) => !v);
             }}
@@ -139,14 +268,34 @@ export default function CadastroColaboradores() {
         <div className="collapse-inner">
           {formVisitado && (
             <div className="collapse-content">
-              <NovoColaboradorForm onCancelar={() => setFormAberto(false)} onCriar={handleCriar} />
+              <NovoColaboradorForm
+                key={colaboradorEditando?.id ?? "novo"}
+                colaborador={colaboradorEditando}
+                onCancelar={fecharForm}
+                onSalvar={handleSalvar}
+              />
             </div>
           )}
         </div>
       </div>
 
-      <div className="card card-pad">
+      <div className="card card-pad" style={{ position: "relative" }} ref={cardRef}>
         <div className="section-title">Colaboradores</div>
+        <div className="search-box">
+          <Search size={16} className="search-icon" />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome, cargo, código ou matrícula…"
+            aria-label="Buscar colaborador"
+          />
+          {busca && (
+            <button type="button" className="search-clear" onClick={() => setBusca("")} aria-label="Limpar busca">
+              <X size={14} />
+            </button>
+          )}
+        </div>
         {erroCarregamento && <div className="login-error" style={{ marginBottom: 14 }}>{erroCarregamento}</div>}
         {carregando ? (
           <div className="section-hint">Carregando colaboradores…</div>
@@ -173,83 +322,131 @@ export default function CadastroColaboradores() {
               key: "acao",
               label: "",
               render: (r) => (
-                <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => handleVerTimeline(r)}>
-                  {selected?.id === r.id && timelineAberta ? "Ocultar timeline" : "Ver timeline"}
-                </button>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => handleEditar(r)}>
+                    Editar
+                  </button>
+                  <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 12 }} onClick={(e) => handleVerTimeline(r, e)}>
+                    {selected?.id === r.id && timelineAberta ? "Ocultar timeline" : "Ver timeline"}
+                  </button>
+                  {r.status !== "Desligado" && (
+                    <button
+                      className="btn btn-outline"
+                      style={{ padding: "5px 10px", fontSize: 12 }}
+                      onClick={() => handleDesligar(r)}
+                    >
+                      Desligar
+                    </button>
+                  )}
+                  <button
+                    className="btn btn-outline"
+                    style={{ padding: "5px 10px", fontSize: 12, color: "var(--color-danger)" }}
+                    onClick={() => handleExcluir(r)}
+                  >
+                    Excluir
+                  </button>
+                </div>
               ),
             },
           ]}
-          rows={colaboradores}
+          rows={colaboradoresFiltrados}
         />
+        )}
+
+        {timelineAberta && selected && (
+          <div
+            className="card card-pad collapse-content timeline-popover"
+            style={{ top: timelineTop }}
+            key={selected.id}
+          >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <Avatar nome={selected.nome} foto={selected.foto} size={44} />
+                    <div className="section-title" style={{ marginBottom: 0 }}>
+                      Timeline completa — {selected.nome} ({selected.id})
+                    </div>
+                  </div>
+                  <button
+                    className="icon-btn"
+                    aria-label="Fechar timeline"
+                    onClick={() => setTimelineAberta(false)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="grid grid-4" style={{ marginBottom: 18 }}>
+                  <div>
+                    <div className="kpi-label">Departamento / Centro de custo</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>{selected.departamento} · {selected.centroCusto}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Equipe / Gestor</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>{selected.equipe} · {selected.gestor}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Escolaridade / Dependentes</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>{selected.escolaridade} · {selected.dependentes} dependente(s)</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Código Domínio</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>{selected.codigoDominio || "—"}</div>
+                  </div>
+                </div>
+
+                <div className="timeline">
+                  <div className="timeline-item">
+                    <div className="timeline-date">{selected.admissao}</div>
+                    <div className="timeline-desc">Admissão como {selected.cargo}.</div>
+                  </div>
+                  {selected.cnh && (
+                    <div className="timeline-item">
+                      <div className="timeline-date">CNH categoria {selected.cnh.categoria}</div>
+                      <div className="timeline-desc">Válida até {selected.cnh.validade}.</div>
+                    </div>
+                  )}
+                  {selected.nrs.map((nr) => (
+                    <div className="timeline-item" key={nr}>
+                      <div className="timeline-date">NR</div>
+                      <div className="timeline-desc">{nr} — vínculo ativo no histórico de treinamentos.</div>
+                    </div>
+                  ))}
+                  {selected.certificacoes.map((cert) => (
+                    <div className="timeline-item" key={cert}>
+                      <div className="timeline-date">Certificação</div>
+                      <div className="timeline-desc">{cert}</div>
+                    </div>
+                  ))}
+                  {(selected.equipamentos || []).map((eq) => (
+                    <div className="timeline-item" key={eq}>
+                      <div className="timeline-date">Equipamento</div>
+                      <div className="timeline-desc">Habilitado para operar: {eq}.</div>
+                    </div>
+                  ))}
+                </div>
+          </div>
         )}
       </div>
 
-      <div className={`collapse ${timelineAberta ? "open" : ""}`}>
-        <div className="collapse-inner">
-          {selected && (
-            <div className="card card-pad collapse-content" style={{ marginTop: 20 }} key={selected.id}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <Avatar nome={selected.nome} foto={selected.foto} size={44} />
-                  <div className="section-title" style={{ marginBottom: 0 }}>
-                    Timeline completa — {selected.nome} ({selected.id})
-                  </div>
-                </div>
-                <button
-                  className="icon-btn"
-                  aria-label="Fechar timeline"
-                  onClick={() => setTimelineAberta(false)}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="grid grid-4" style={{ marginBottom: 18 }}>
-                <div>
-                  <div className="kpi-label">Departamento / Centro de custo</div>
-                  <div style={{ fontSize: 13, marginTop: 4 }}>{selected.departamento} · {selected.centroCusto}</div>
-                </div>
-                <div>
-                  <div className="kpi-label">Equipe / Gestor</div>
-                  <div style={{ fontSize: 13, marginTop: 4 }}>{selected.equipe} · {selected.gestor}</div>
-                </div>
-                <div>
-                  <div className="kpi-label">Escolaridade / Dependentes</div>
-                  <div style={{ fontSize: 13, marginTop: 4 }}>{selected.escolaridade} · {selected.dependentes} dependente(s)</div>
-                </div>
-                <div>
-                  <div className="kpi-label">Código Domínio</div>
-                  <div style={{ fontSize: 13, marginTop: 4 }}>{selected.codigoDominio || "—"}</div>
-                </div>
-              </div>
+      {colaboradorParaExcluir && (
+        <ConfirmDeleteModal
+          titulo="Excluir colaborador"
+          mensagem={`Tem certeza que deseja excluir "${colaboradorParaExcluir.nome}" (${colaboradorParaExcluir.id})? Essa ação não pode ser desfeita.`}
+          confirmando={excluindo}
+          erro={erroExclusao}
+          onConfirmar={confirmarExclusao}
+          onCancelar={fecharModalExclusao}
+        />
+      )}
 
-              <div className="timeline">
-                <div className="timeline-item">
-                  <div className="timeline-date">{selected.admissao}</div>
-                  <div className="timeline-desc">Admissão como {selected.cargo}.</div>
-                </div>
-                {selected.cnh && (
-                  <div className="timeline-item">
-                    <div className="timeline-date">CNH categoria {selected.cnh.categoria}</div>
-                    <div className="timeline-desc">Válida até {selected.cnh.validade}.</div>
-                  </div>
-                )}
-                {selected.nrs.map((nr) => (
-                  <div className="timeline-item" key={nr}>
-                    <div className="timeline-date">NR</div>
-                    <div className="timeline-desc">{nr} — vínculo ativo no histórico de treinamentos.</div>
-                  </div>
-                ))}
-                {selected.certificacoes.map((cert) => (
-                  <div className="timeline-item" key={cert}>
-                    <div className="timeline-date">Certificação</div>
-                    <div className="timeline-desc">{cert}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {colaboradorDesligando && (
+        <IniciarDesligamentoModal
+          colaborador={colaboradorDesligando}
+          onFechar={fecharModalDesligamento}
+          onConfirmar={handleConfirmarDesligamento}
+          salvando={salvandoDesligamento}
+          erro={erroDesligamento}
+        />
+      )}
     </div>
   );
 }

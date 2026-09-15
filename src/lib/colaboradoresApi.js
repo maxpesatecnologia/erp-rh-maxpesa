@@ -7,13 +7,13 @@ function paraLinha(dados) {
     nome: dados.nome,
     codigo_dominio: dados.codigoDominio || null,
     foto_url: dados.foto || null,
-    cargo: dados.cargo,
+    cargo: dados.cargo || null,
     departamento: dados.departamento,
-    filial: dados.filial,
+    filial: dados.filial || null,
     centro_custo: dados.centroCusto || null,
-    gestor: dados.gestor,
+    gestor: dados.gestor || null,
     equipe: dados.equipe || null,
-    admissao: dados.admissao,
+    admissao: dados.admissao || null,
     escolaridade: dados.escolaridade || null,
     dependentes: Number(dados.dependentes) || 0,
     cnh_categoria: dados.cnhCategoria || null,
@@ -21,6 +21,9 @@ function paraLinha(dados) {
     nrs: dados.nrs ? String(dados.nrs).split(",").map((s) => s.trim()).filter(Boolean) : [],
     certificacoes: dados.certificacoes
       ? String(dados.certificacoes).split(",").map((s) => s.trim()).filter(Boolean)
+      : [],
+    equipamentos: dados.equipamentos
+      ? String(dados.equipamentos).split(",").map((s) => s.trim()).filter(Boolean)
       : [],
   };
 }
@@ -44,6 +47,7 @@ function paraColaborador(row) {
     cnh: row.cnh_categoria ? { categoria: row.cnh_categoria, validade: row.cnh_validade } : null,
     nrs: row.nrs ?? [],
     certificacoes: row.certificacoes ?? [],
+    equipamentos: row.equipamentos ?? [],
     status: row.status,
   };
 }
@@ -65,6 +69,33 @@ export async function criarColaborador(dados) {
     .single();
   if (error) throw new Error(error.message);
   return paraColaborador(data);
+}
+
+export async function atualizarColaborador(matricula, dados) {
+  const { data, error } = await supabase
+    .from("rh_colaboradores")
+    .update(paraLinha(dados))
+    .eq("matricula", matricula)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return paraColaborador(data);
+}
+
+export async function atualizarStatusColaborador(matricula, status) {
+  const { data, error } = await supabase
+    .from("rh_colaboradores")
+    .update({ status })
+    .eq("matricula", matricula)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return paraColaborador(data);
+}
+
+export async function excluirColaborador(matricula) {
+  const { error } = await supabase.from("rh_colaboradores").delete().eq("matricula", matricula);
+  if (error) throw new Error(error.message);
 }
 
 export async function importarColaboradores(linhas) {

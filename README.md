@@ -80,6 +80,239 @@ O front-end já está todo preparado para isso: veja `src/lib/supabaseClient.js`
 Cada módulo do menu (`src/config/modules.js`) já declara quais `roles` podem acessá-lo — é só ajustar essa lista
 conforme a política de acesso definitiva da Maxpesa.
 
+### Admissão Digital é alimentada pelo Recrutamento
+
+A tela de Admissão Digital não tem cadastro manual: uma admissão nasce quando o RH clica em **"Efetivar
+contratação"** no card de um candidato que chegou na última etapa do pipeline de Recrutamento & Seleção
+("Aprovação de Contratação"). Isso cria uma linha na tabela `rh_admissoes` com o checklist zerado, evitando
+digitar o nome/vaga do candidato de novo.
+
+Para isso funcionar com o Supabase real, crie a tabela (ajuste as políticas de RLS conforme o padrão que você já
+usou em `rh_candidatos`):
+
+```sql
+create table rh_admissoes (
+  id uuid primary key default gen_random_uuid(),
+  candidato_id uuid references rh_candidatos (id) on delete set null,
+  nome text not null,
+  cargo text,
+  filial text,
+  data_prevista date,
+  checklist jsonb not null default '{
+    "dadosPessoais": false,
+    "documentos": false,
+    "exameAdmissional": false,
+    "assinaturaContrato": false,
+    "integracaoDominio": false
+  }',
+  created_at timestamptz not null default now()
+);
+
+alter table rh_admissoes enable row level security;
+
+-- sem nenhuma policy, o Postgres nega até usuário autenticado — libere
+-- leitura/escrita para admin e rh (mesmos papéis que já acessam o módulo)
+create policy "admin e rh leem admissões"
+  on rh_admissoes for select
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "admin e rh criam admissões"
+  on rh_admissoes for insert
+  with check (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "admin e rh atualizam admissões"
+  on rh_admissoes for update
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "admin e rh cancelam admissões"
+  on rh_admissoes for delete
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+```
+
+A tela permite cancelar uma admissão (botão "×" no card, com confirmação) — isso executa um `delete` na linha, então a policy de `delete` acima é obrigatória para o botão funcionar com o Supabase real.
+
+Sem `.env` configurado (modo demo), a tela funciona do mesmo jeito, mas guarda as admissões só em memória
+(`src/lib/admissaoApi.js`) — elas somem ao recarregar a página, só para dar para navegar o fluxo sem backend.
+
+### Desligamento Digital é a lógica inversa da Admissão
+
+Mesmo padrão da Admissão, só que "de trás para frente": o Desligamento Digital não tem cadastro manual, ele nasce
+quando o RH clica em **"Desligar"** na linha de um colaborador ativo no Cadastro de Colaboradores. Isso cria uma
+linha na tabela `rh_desligamentos` com o checklist de saída zerado e marca o colaborador como "Desligado".
+
+```sql
+create table rh_desligamentos (
+  id uuid primary key default gen_random_uuid(),
+  colaborador_id text not null, -- referencia rh_colaboradores.matricula
+  motivo text,
+  data_desligamento date,
+  checklist jsonb not null default '{
+    "entrevistaDesligamento": false,
+    "devolucaoEquipamentos": false,
+    "exameDemissional": false,
+    "acertoRescisorio": false,
+    "homologacaoSindicato": false,
+    "baixaDominio": false
+  }',
+  created_at timestamptz not null default now()
+);
+
+alter table rh_desligamentos enable row level security;
+
+create policy "admin e rh leem desligamentos"
+  on rh_desligamentos for select
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "admin e rh criam desligamentos"
+  on rh_desligamentos for insert
+  with check (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "admin e rh atualizam desligamentos"
+  on rh_desligamentos for update
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "admin e rh cancelam desligamentos"
+  on rh_desligamentos for delete
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+```
+
+Sem `.env` configurado (modo demo), a tela funciona do mesmo jeito, mas guarda os desligamentos só em memória
+(`src/lib/desligamentoApi.js`) — eles somem ao recarregar a página, só para dar para navegar o fluxo sem backend.
+
+Clicar em "Desligar" também atualiza a coluna `status` do colaborador em `rh_colaboradores` para "Desligado"
+(`atualizarStatusColaborador` em `src/lib/colaboradoresApi.js`). O botão "Cancelar desligamento" na tela de
+Desligamento Digital reverte o processo por completo: apaga a linha em `rh_desligamentos` e volta o colaborador
+para "Ativo" — útil quando o desligamento foi iniciado por engano.
+
+### Avaliação de Desempenho (proposta em validação com a gestão)
+
+Diferente de Admissão/Desligamento, aqui existe um cadastro manual: o RH/admin clica em **"Iniciar avaliação"**,
+escolhe o colaborador e define as metas do ciclo (peso somando 100%) — a tabela padrão de competências entra
+sozinha. A partir daí, quem tem acesso à tela lança as notas de 1 a 5 (autoavaliação e avaliação do gestor) e o
+PDI; a nota final é sempre **calculada no front-end** (`src/lib/avaliacaoCalculo.js`), nunca gravada como número
+solto — os pesos (30% autoavaliação / 70% gestor, 40% competências / 60% metas) são só o ponto de partida da
+conversa com a gestão, ajuste as constantes desse arquivo quando os números forem validados.
+
+```sql
+create table rh_avaliacoes (
+  id uuid primary key default gen_random_uuid(),
+  colaborador_id text not null, -- referencia rh_colaboradores.matricula
+  ciclo text not null,
+  status text not null default 'rascunho',
+  competencias jsonb not null default '[]',
+  metas jsonb not null default '[]',
+  pdi jsonb not null default '[]',
+  created_at timestamptz not null default now()
+);
+
+alter table rh_avaliacoes enable row level security;
+
+create policy "admin e rh leem avaliações"
+  on rh_avaliacoes for select
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "gestor lê avaliações do próprio time"
+  on rh_avaliacoes for select
+  using (
+    exists (
+      select 1 from rh_profiles p
+      join rh_colaboradores c on c.matricula = rh_avaliacoes.colaborador_id
+      where p.id = auth.uid() and p.role = 'gestor' and c.gestor = p.nome
+    )
+  );
+
+create policy "admin e rh criam avaliações"
+  on rh_avaliacoes for insert
+  with check (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "admin e rh atualizam avaliações"
+  on rh_avaliacoes for update
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "gestor atualiza avaliações do próprio time"
+  on rh_avaliacoes for update
+  using (
+    exists (
+      select 1 from rh_profiles p
+      join rh_colaboradores c on c.matricula = rh_avaliacoes.colaborador_id
+      where p.id = auth.uid() and p.role = 'gestor' and c.gestor = p.nome
+    )
+  );
+
+create policy "admin e rh excluem avaliações"
+  on rh_avaliacoes for delete
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+```
+
+Sem `.env` configurado (modo demo), a tela funciona do mesmo jeito, mas guarda as avaliações só em memória
+(`src/lib/avaliacaoApi.js`) — elas somem ao recarregar a página, só para dar para navegar o fluxo sem backend.
+
+Hoje só `admin`, `rh` e `gestor` têm acesso à rota `/avaliacao-desempenho` (`src/config/modules.js`) — o
+colaborador ainda não preenche a própria autoavaliação pelo Portal do Colaborador, então quem lança a nota
+"Auto" também é o admin/RH (ex.: a partir de um formulário em papel/Forms). Se decidirem abrir a autoavaliação
+para o colaborador preencher sozinho, isso vira uma tela nova no Portal do Colaborador, com uma policy de RLS
+adicional restringindo cada um à própria linha (`colaborador_id` batendo com o perfil logado).
+
 ### Convenção de prefixo `rh_` (banco compartilhado entre sistemas)
 
 O projeto Supabase pode acabar sendo compartilhado entre vários sistemas internos da Maxpesa, não só este ERP

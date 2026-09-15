@@ -1,8 +1,32 @@
+import { useMemo } from "react";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import { EXAMES_ASO, VACINAS, CLINICAS } from "../../data/mock/medicina";
+import { formatDate, diasAte } from "../../utils/format";
+
+function statusPorValidade(validade) {
+  if (!validade) return "Concluído";
+  const dias = diasAte(validade);
+  if (dias < 0) return "Vencido";
+  if (dias <= 60) return "Vencendo";
+  return "Válido";
+}
+
+function statusDoExame(exame) {
+  if (exame.resultado === "Inapto") return "Inapto";
+  return statusPorValidade(exame.validade);
+}
 
 export default function MedicinaOcupacional() {
+  const exames = useMemo(
+    () => EXAMES_ASO.map((e) => ({ ...e, status: statusDoExame(e) })),
+    []
+  );
+  const vacinas = useMemo(
+    () => VACINAS.map((v) => ({ ...v, status: statusPorValidade(v.validade) })),
+    []
+  );
+
   return (
     <div>
       <div className="page-header">
@@ -19,11 +43,12 @@ export default function MedicinaOcupacional() {
             { key: "colaborador", label: "Colaborador" },
             { key: "tipo", label: "Tipo de exame" },
             { key: "clinica", label: "Clínica" },
-            { key: "data", label: "Data" },
-            { key: "validade", label: "Validade" },
+            { key: "data", label: "Data", render: (r) => formatDate(r.data) },
+            { key: "validade", label: "Validade", render: (r) => (r.validade ? formatDate(r.validade) : "—") },
+            { key: "resultado", label: "Resultado", render: (r) => <StatusBadge status={r.resultado} /> },
             { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
           ]}
-          rows={EXAMES_ASO}
+          rows={exames}
         />
       </div>
 
@@ -34,10 +59,11 @@ export default function MedicinaOcupacional() {
             columns={[
               { key: "colaborador", label: "Colaborador" },
               { key: "vacina", label: "Vacina" },
-              { key: "validade", label: "Validade" },
+              { key: "aplicacao", label: "Aplicação", render: (r) => formatDate(r.aplicacao) },
+              { key: "validade", label: "Validade", render: (r) => formatDate(r.validade) },
               { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
             ]}
-            rows={VACINAS}
+            rows={vacinas}
           />
         </div>
         <div className="card card-pad">

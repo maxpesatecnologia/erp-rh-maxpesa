@@ -37,6 +37,12 @@ export const NAV_SECTIONS = [
         icon: LayoutDashboard,
         roles: ["admin", "rh", "gestor"],
       },
+      {
+        path: "/portal",
+        label: "Acesso Rápido",
+        icon: IdCard,
+        roles: ["admin", "rh", "gestor", "colaborador"],
+      },
     ],
   },
   {
@@ -47,12 +53,6 @@ export const NAV_SECTIONS = [
         label: "Cadastro de Colaboradores",
         icon: Users,
         roles: ["admin", "rh", "gestor"],
-      },
-      {
-        path: "/portal",
-        label: "Portal do Colaborador",
-        icon: IdCard,
-        roles: ["admin", "rh", "gestor", "colaborador"],
       },
       {
         path: "/recrutamento",

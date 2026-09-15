@@ -22,6 +22,7 @@ const COLUNAS_MODELO = [
   "cnhValidade",
   "nrs",
   "certificacoes",
+  "equipamentos",
 ];
 
 const LINHA_EXEMPLO = [
@@ -36,6 +37,7 @@ const LINHA_EXEMPLO = [
   "2026-09-15",
   "Ensino Médio Completo",
   "1",
+  "",
   "",
   "",
   "",
@@ -115,17 +117,49 @@ function linhasParaRegistros(matriz) {
   return { cabecalho, linhas: linhasDados };
 }
 
-// Lê a primeira planilha de um arquivo .xlsx/.xls, convertendo datas para AAAA-MM-DD
-// (dateNF) para casar com o mesmo formato aceito na importação via CSV.
+function formatarDataISO(data) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+// Extrai o texto de uma célula sem depender só do texto formatado em cache
+// (célula.w): algumas planilhas (ex.: colunas com fórmula/VLOOKUP) chegam sem
+// esse cache, então cai pro valor bruto (célula.v), formatando número/data
+// manualmente quando possível.
+function celulaParaTexto(cell) {
+  if (!cell) return "";
+  if (cell.t === "d" && cell.v instanceof Date) return formatarDataISO(cell.v);
+  if (cell.w !== undefined && cell.w !== null && cell.w !== "") return String(cell.w).trim();
+  if (cell.v === undefined || cell.v === null) return "";
+  if (cell.t === "n" && cell.z && XLSX.SSF) {
+    try {
+      return String(XLSX.SSF.format(cell.z, cell.v)).trim();
+    } catch {
+      return String(cell.v).trim();
+    }
+  }
+  return String(cell.v).trim();
+}
+
+// Lê a primeira planilha de um arquivo .xlsx/.xls célula a célula (em vez de
+// usar sheet_to_json com raw:false), pra conseguir cair pro valor bruto quando
+// o texto formatado não estiver em cache no arquivo.
 function parseExcel(arrayBuffer) {
-  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
   const primeiraAba = workbook.Sheets[workbook.SheetNames[0]];
-  const matriz = XLSX.utils.sheet_to_json(primeiraAba, {
-    header: 1,
-    raw: false,
-    dateNF: "yyyy-mm-dd",
-    defval: "",
-  });
+  if (!primeiraAba["!ref"]) return { cabecalho: [], linhas: [] };
+  const intervalo = XLSX.utils.decode_range(primeiraAba["!ref"]);
+  const matriz = [];
+  for (let linha = intervalo.s.r; linha <= intervalo.e.r; linha++) {
+    const valoresLinha = [];
+    for (let coluna = intervalo.s.c; coluna <= intervalo.e.c; coluna++) {
+      const endereco = XLSX.utils.encode_cell({ r: linha, c: coluna });
+      valoresLinha.push(celulaParaTexto(primeiraAba[endereco]));
+    }
+    matriz.push(valoresLinha);
+  }
   return linhasParaRegistros(matriz);
 }
 
@@ -141,14 +175,24 @@ function normalizarData(valor) {
   return null;
 }
 
+// filial, gestor, cargo e admissao podem chegar em branco na importação
+// (preenchidos depois, diretamente no cadastro) — só nome e departamento
+// bloqueiam a linha. admissao, quando informada, ainda precisa ser uma data válida.
+const CAMPOS_OPCIONAIS_NA_IMPORTACAO = ["filial", "gestor", "cargo", "admissao"];
+
 function validarLinha(registro) {
   const erros = [];
   for (const campo of CAMPOS_OBRIGATORIOS) {
     if (campo === "admissao") continue;
+    if (CAMPOS_OPCIONAIS_NA_IMPORTACAO.includes(campo)) continue;
     if (!String(registro[campo] ?? "").trim()) erros.push(`"${campo}" obrigatório`);
   }
-  const admissaoNormalizada = normalizarData(registro.admissao);
-  if (!admissaoNormalizada) erros.push('"admissao" obrigatória (use AAAA-MM-DD ou DD/MM/AAAA)');
+  const admissaoBruta = String(registro.admissao ?? "").trim();
+  let admissaoNormalizada = null;
+  if (admissaoBruta) {
+    admissaoNormalizada = normalizarData(admissaoBruta);
+    if (!admissaoNormalizada) erros.push('"admissao" inválida (use AAAA-MM-DD ou DD/MM/AAAA)');
+  }
   return { erros, admissaoNormalizada };
 }
 
@@ -249,7 +293,10 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar }) {
         >
           <Download size={14} /> Baixar modelo CSV
         </a>
-        <span className="section-hint">Colunas obrigatórias: {CAMPOS_OBRIGATORIOS.join(", ")}.</span>
+        <span className="section-hint">
+          Colunas obrigatórias: {CAMPOS_OBRIGATORIOS.filter((c) => !CAMPOS_OPCIONAIS_NA_IMPORTACAO.includes(c)).join(", ")}.
+          {" "}(as demais — {CAMPOS_OPCIONAIS_NA_IMPORTACAO.join(", ")} — podem ficar em branco e ser preenchidas depois.)
+        </span>
       </div>
 
       <label className="upload-drop" htmlFor="import-colaboradores-input">

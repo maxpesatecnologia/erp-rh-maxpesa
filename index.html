@@ -13,8 +13,38 @@
       rel="stylesheet"
     />
     <title>Sistema de Gestão de Recursos Humanos | Grupo Maxpesa</title>
+    <style>
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #ffffff;
+        transition: opacity 0.35s ease;
+      }
+      #app-splash img {
+        width: 100%;
+        max-width: 220px;
+        height: auto;
+        object-fit: contain;
+        animation: app-splash-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes app-splash-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.55; }
+      }
+      #app-splash.app-splash-hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
   </head>
   <body>
+    <div id="app-splash">
+      <img src="/maxpesa_logo_png.png" alt="Maxpesa" />
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

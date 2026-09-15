@@ -3,6 +3,7 @@ const MAP = {
   valido: "success",
   ativo: "success",
   aprovado: "success",
+  apto: "success",
   em_dia: "success",
   concluido: "success",
   concluído: "success",
@@ -18,6 +19,7 @@ const MAP = {
   inapto: "danger",
   atrasado: "danger",
   erro: "danger",
+  desligado: "danger",
 
   informativo: "info",
   novo: "info",

@@ -2,6 +2,15 @@ import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import { DOCUMENTOS_LEGAIS, DDS_REGISTROS, APRS, INSPECOES, NAO_CONFORMIDADES, CATS } from "../../data/mock/seguranca";
 
+// Botão sem funcionalidade — só ilustra o layout enquanto os dados são mock.
+function BotaoEditar() {
+  return (
+    <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 12 }} disabled>
+      Editar
+    </button>
+  );
+}
+
 export default function SegurancaTrabalho() {
   return (
     <div>
@@ -20,6 +29,7 @@ export default function SegurancaTrabalho() {
             { key: "filial", label: "Filial" },
             { key: "validade", label: "Validade" },
             { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
+            { key: "acoes", label: "", render: () => <BotaoEditar /> },
           ]}
           rows={DOCUMENTOS_LEGAIS}
         />
@@ -33,6 +43,7 @@ export default function SegurancaTrabalho() {
             { key: "equipe", label: "Equipe" },
             { key: "risco", label: "Risco" },
             { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
+            { key: "acoes", label: "", render: () => <BotaoEditar /> },
           ]}
           rows={APRS}
         />
@@ -46,6 +57,7 @@ export default function SegurancaTrabalho() {
             { key: "equipe", label: "Equipe" },
             { key: "data", label: "Data" },
             { key: "participantes", label: "Participantes" },
+            { key: "acoes", label: "", render: () => <BotaoEditar /> },
           ]}
           rows={DDS_REGISTROS}
         />
@@ -59,6 +71,7 @@ export default function SegurancaTrabalho() {
             { key: "tipo", label: "Tipo" },
             { key: "data", label: "Data" },
             { key: "resultado", label: "Resultado", render: (r) => <StatusBadge status={r.resultado === "Conforme" ? "Válido" : "Vencido"} /> },
+            { key: "acoes", label: "", render: () => <BotaoEditar /> },
           ]}
           rows={INSPECOES}
         />
@@ -73,6 +86,7 @@ export default function SegurancaTrabalho() {
             { key: "responsavel", label: "Responsável" },
             { key: "prazo", label: "Prazo" },
             { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
+            { key: "acoes", label: "", render: () => <BotaoEditar /> },
           ]}
           rows={NAO_CONFORMIDADES}
         />
@@ -86,6 +100,7 @@ export default function SegurancaTrabalho() {
             { key: "data", label: "Data" },
             { key: "descricao", label: "Descrição" },
             { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
+            { key: "acoes", label: "", render: () => <BotaoEditar /> },
           ]}
           rows={CATS}
         />

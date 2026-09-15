@@ -1,126 +1,144 @@
-import { Wrench, Gauge, Clock, ShieldCheck, Building2, Star, AlertTriangle } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Search, X } from "lucide-react";
+import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import Avatar from "../../components/Avatar";
-import { OPERADORES } from "../../data/mock/operadores";
+import { COLABORADORES } from "../../data/mock/colaboradores";
+import { listarColaboradores } from "../../lib/colaboradoresApi";
+import { isSupabaseConfigured } from "../../lib/supabaseClient";
 
-function tierClass(categoria) {
-  if (categoria === "Sênior") return "tier-senior";
-  if (categoria === "Pleno") return "tier-pleno";
-  return "tier-junior";
-}
-
-function disponibilidadeClass(status) {
-  if (status === "Disponível") return "badge-success";
-  if (status === "Em operação") return "badge-info";
-  if (status === "Bloqueado") return "badge-danger";
-  return "badge-neutral";
+// Remove acentos pra comparar "Operação", "Operacional", "Operações" etc. sem
+// depender de como o RH digitou o departamento (campo é texto livre).
+function normalizar(texto) {
+  return String(texto || "")
+    .normalize("NFD")
+    .replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+    .toLowerCase();
 }
 
 export default function OperadoresEquipamentos() {
+  const navigate = useNavigate();
+  const [colaboradores, setColaboradores] = useState(isSupabaseConfigured ? [] : COLABORADORES);
+  const [carregando, setCarregando] = useState(isSupabaseConfigured);
+  const [erroCarregamento, setErroCarregamento] = useState("");
+  const [busca, setBusca] = useState("");
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    listarColaboradores()
+      .then(setColaboradores)
+      .catch((erro) => setErroCarregamento(erro.message))
+      .finally(() => setCarregando(false));
+  }, []);
+
+  const operadores = useMemo(() => {
+    return colaboradores.filter(
+      (c) => c.status !== "Desligado" && normalizar(c.departamento).includes("opera")
+    );
+  }, [colaboradores]);
+
+  const operadoresFiltrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return operadores;
+    return operadores.filter((c) =>
+      [c.nome, c.cargo, c.filial, ...(c.equipamentos || [])].some((campo) =>
+        String(campo || "").toLowerCase().includes(termo)
+      )
+    );
+  }, [operadores, busca]);
+
   return (
     <div>
       <div className="page-header">
         <div>
           <h1>Operadores de Equipamentos</h1>
-          <div className="page-subtitle">Diferencial Maxpesa — passaporte operacional completo de cada operador</div>
+          <div className="page-subtitle">
+            Colaboradores da operação e os equipamentos que cada um está habilitado a operar
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-2">
-        {OPERADORES.map((op) => {
-          const estrelas = Math.round(op.avaliacaoMedia);
-          return (
-            <div className="card operador-card" key={op.id}>
-              <div className="operador-header">
-                <Avatar nome={op.nome} foto={op.foto} size={46} />
-                <div className="operador-card-title">
-                  <div className="operador-name-row">
-                    <span className="operador-name">{op.nome}</span>
-                    <span className={`tier-pill ${tierClass(op.categoriaOperacional)}`}>{op.categoriaOperacional}</span>
+      <div className="card card-pad">
+        <div className="section-title">Operadores</div>
+        <div style={{ fontSize: 12.5, color: "var(--color-text-muted)", marginBottom: 14 }}>
+          Lista puxada do cadastro de colaboradores (departamento contendo "Operação"). Para
+          incluir alguém aqui ou atualizar os equipamentos que opera, edite o colaborador em{" "}
+          <button
+            type="button"
+            onClick={() => navigate("/colaboradores")}
+            style={{
+              display: "inline",
+              padding: 0,
+              border: "none",
+              background: "none",
+              font: "inherit",
+              color: "var(--color-accent)",
+              cursor: "pointer",
+            }}
+          >
+            Cadastro de Colaboradores
+          </button>
+          .
+        </div>
+        <div className="search-box">
+          <Search size={16} className="search-icon" />
+          <input
+            type="text"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome, cargo, filial ou equipamento…"
+            aria-label="Buscar operador"
+          />
+          {busca && (
+            <button type="button" className="search-clear" onClick={() => setBusca("")} aria-label="Limpar busca">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        {erroCarregamento && <div className="login-error" style={{ marginBottom: 14 }}>{erroCarregamento}</div>}
+        {carregando ? (
+          <div className="section-hint">Carregando operadores…</div>
+        ) : operadoresFiltrados.length === 0 ? (
+          <div className="section-hint">Nenhum operador encontrado.</div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: "id", label: "Matrícula" },
+              {
+                key: "nome",
+                label: "Nome",
+                render: (r) => (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Avatar nome={r.nome} foto={r.foto} size={28} />
+                    <span>{r.nome}</span>
                   </div>
-                  <div className="operador-id">{op.id}</div>
-                </div>
-                <span className={`badge ${disponibilidadeClass(op.disponibilidade)}`}>{op.disponibilidade}</span>
-              </div>
-
-              <div className="operador-section">
-                <div className="operador-section-label">
-                  <Wrench size={12} /> Equipamentos habilitados
-                </div>
-                <div className="chip-row">
-                  {op.equipamentosHabilitados.map((eq) => (
-                    <span className="equip-chip" key={eq}>
-                      {eq}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="operador-stats">
-                <div className="operador-stat">
-                  <Gauge size={14} />
-                  <div>
-                    <div className="operador-stat-value">{op.capacidadeMaxima}</div>
-                    <div className="operador-stat-label">Capacidade máx.</div>
-                  </div>
-                </div>
-                <div className="operador-stat">
-                  <Clock size={14} />
-                  <div>
-                    <div className="operador-stat-value">{op.horasExperiencia.toLocaleString("pt-BR")} h</div>
-                    <div className="operador-stat-label">Experiência</div>
-                  </div>
-                </div>
-                <div className="operador-stat">
-                  <ShieldCheck size={14} />
-                  <div>
-                    <div className="operador-stat-value">
-                      <StatusBadge status={op.aptidaoMedica} />
+                ),
+              },
+              { key: "cargo", label: "Cargo" },
+              { key: "filial", label: "Filial" },
+              { key: "cnh", label: "CNH", render: (r) => (r.cnh ? `${r.cnh.categoria} (até ${r.cnh.validade})` : "—") },
+              {
+                key: "equipamentos",
+                label: "Equipamentos que opera",
+                render: (r) =>
+                  r.equipamentos && r.equipamentos.length > 0 ? (
+                    <div className="chip-row">
+                      {r.equipamentos.map((eq) => (
+                        <span className="equip-chip" key={eq}>
+                          {eq}
+                        </span>
+                      ))}
                     </div>
-                    <div className="operador-stat-label">Aptidão médica</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="operador-rating-row">
-                <div className="operador-stars">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star key={i} size={14} className={i <= estrelas ? "star-filled" : "star-empty"} />
-                  ))}
-                </div>
-                <span className="operador-rating-value">{op.avaliacaoMedia.toFixed(1)}</span>
-
-                {(op.penalidades > 0 || op.ocorrencias > 0) && (
-                  <span className="operador-flags">
-                    {op.penalidades > 0 && (
-                      <span className="flag-chip flag-danger">
-                        <AlertTriangle size={11} /> {op.penalidades} penalidade{op.penalidades > 1 ? "s" : ""}
-                      </span>
-                    )}
-                    {op.ocorrencias > 0 && (
-                      <span className="flag-chip flag-warning">
-                        <AlertTriangle size={11} /> {op.ocorrencias} ocorrência{op.ocorrencias > 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </span>
-                )}
-              </div>
-
-              <div className="operador-section">
-                <div className="operador-section-label">
-                  <Building2 size={12} /> Clientes habilitados
-                </div>
-                <div className="chip-row">
-                  {op.clientesHabilitados.map((c) => (
-                    <span className="client-chip" key={c}>
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+                  ) : (
+                    "—"
+                  ),
+              },
+              { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
+            ]}
+            rows={operadoresFiltrados}
+          />
+        )}
       </div>
     </div>
   );

@@ -8,3 +8,11 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+const splash = document.getElementById('app-splash')
+if (splash) {
+  requestAnimationFrame(() => {
+    splash.classList.add('app-splash-hidden')
+    setTimeout(() => splash.remove(), 400)
+  })
+}
