@@ -1,7 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, Cake, CalendarClock, Palmtree, Plus, Search, X } from "lucide-react";
 import { COMUNICADOS, ANIVERSARIANTES, FERIAS_EQUIPE } from "../../data/mock/comunicacao";
 import { formatDate, formatDiaMes, diasAte, proximoAniversario } from "../../utils/format";
+import { isSupabaseConfigured } from "../../lib/supabaseClient";
+import { listarColaboradores } from "../../lib/colaboradoresApi";
+import { listarFerias } from "../../lib/feriasApi";
 
 const STATUS_FERIAS_BADGE = {
   "Em andamento": "badge-info",
@@ -49,6 +52,26 @@ export default function ComunicacaoInterna() {
   const [periodoComunicado, setPeriodoComunicado] = useState("todos");
 
   const [filtroStatusFerias, setFiltroStatusFerias] = useState("todas");
+  const [feriasEquipe, setFeriasEquipe] = useState(isSupabaseConfigured ? [] : FERIAS_EQUIPE);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    Promise.all([listarColaboradores(), listarFerias()])
+      .then(([colaboradores, ferias]) => {
+        const aprovadas = ferias
+          .filter((f) => f.status === "Aprovada")
+          .map((f) => ({
+            id: f.id,
+            nome: colaboradores.find((c) => c.id === f.colaboradorId)?.nome ?? "Colaborador",
+            inicio: f.dataInicio,
+            fim: f.dataFim,
+          }));
+        setFeriasEquipe(aprovadas);
+      })
+      .catch(() => {
+        // Mural não deve travar por causa desse widget — só fica vazio em caso de erro.
+      });
+  }, []);
 
   function publicarComunicado(e) {
     e.preventDefault();
@@ -100,10 +123,10 @@ export default function ComunicacaoInterna() {
 
   const feriasOrdenadas = useMemo(
     () =>
-      FERIAS_EQUIPE.map((f) => ({ ...f, status: statusFerias(f.inicio, f.fim) })).sort(
+      feriasEquipe.map((f) => ({ ...f, status: statusFerias(f.inicio, f.fim) })).sort(
         (a, b) => diasAte(a.inicio) - diasAte(b.inicio)
       ),
-    []
+    [feriasEquipe]
   );
 
   const feriasFiltradas = feriasOrdenadas.filter((f) => {
@@ -125,12 +148,12 @@ export default function ComunicacaoInterna() {
       itens.push({ key: `com-${c.id}`, dias: diasAte(c.dataEvento), icon: CalendarClock, label: c.titulo })
     );
 
-    FERIAS_EQUIPE.filter((f) => diasAte(f.inicio) >= 0 && diasAte(f.inicio) <= 3).forEach((f) =>
+    feriasEquipe.filter((f) => diasAte(f.inicio) >= 0 && diasAte(f.inicio) <= 3).forEach((f) =>
       itens.push({ key: `fer-${f.id}`, dias: diasAte(f.inicio), icon: Palmtree, label: `Férias de ${f.nome} começam` })
     );
 
     return itens.sort((a, b) => a.dias - b.dias);
-  }, [aniversariosOrdenados, comunicados]);
+  }, [aniversariosOrdenados, comunicados, feriasEquipe]);
 
   return (
     <div>

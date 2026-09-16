@@ -6,11 +6,11 @@ import {
   Users,
   IdCard,
   Target,
-  FolderOpen,
   FileText,
   GraduationCap,
   TrendingUp,
   UserMinus,
+  FolderOpen,
   Truck,
   ShieldCheck,
   Stethoscope,
@@ -18,6 +18,7 @@ import {
   Users2,
   Megaphone,
   Bot,
+  Palmtree,
 } from "lucide-react";
 
 export const ROLE_LABELS = {
@@ -58,12 +59,6 @@ export const NAV_SECTIONS = [
         path: "/recrutamento",
         label: "Recrutamento & Seleção",
         icon: Target,
-        roles: ["admin", "rh"],
-      },
-      {
-        path: "/recrutamento/banco-curriculos",
-        label: "Banco de Currículos",
-        icon: FolderOpen,
         roles: ["admin", "rh", "gestor"],
       },
       {
@@ -73,9 +68,21 @@ export const NAV_SECTIONS = [
         roles: ["admin", "rh"],
       },
       {
+        path: "/documentos",
+        label: "Documentos",
+        icon: FolderOpen,
+        roles: ["admin", "rh"],
+      },
+      {
         path: "/desligamento",
         label: "Desligamento Digital",
         icon: UserMinus,
+        roles: ["admin", "rh"],
+      },
+      {
+        path: "/ferias",
+        label: "Gestão de Férias",
+        icon: Palmtree,
         roles: ["admin", "rh"],
       },
       {
@@ -90,17 +97,17 @@ export const NAV_SECTIONS = [
         icon: TrendingUp,
         roles: ["admin", "rh", "gestor"],
       },
+      {
+        path: "/operadores",
+        label: "Competências",
+        icon: Truck,
+        roles: ["admin", "rh", "gestor"],
+      },
     ],
   },
   {
     title: "Operação Maxpesa",
     items: [
-      {
-        path: "/operadores",
-        label: "Operadores de Equipamentos",
-        icon: Truck,
-        roles: ["admin", "rh", "gestor"],
-      },
       {
         path: "/seguranca",
         label: "Segurança do Trabalho",

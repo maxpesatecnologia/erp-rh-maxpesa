@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Plus, Search, Upload, X } from "lucide-react";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
@@ -16,6 +16,7 @@ import {
   atualizarColaborador as atualizarColaboradorRemoto,
   atualizarStatusColaborador,
   excluirColaborador as excluirColaboradorRemoto,
+  excluirTodosColaboradores as excluirTodosColaboradoresRemoto,
   importarColaboradores as importarColaboradoresRemoto,
 } from "../../lib/colaboradoresApi";
 import { criarDesligamento } from "../../lib/desligamentoApi";
@@ -35,16 +36,23 @@ function criarColaborador(novo, id) {
   return {
     ...novo,
     id,
-    status: "Ativo",
-    cnh: novo.cnhCategoria ? { categoria: novo.cnhCategoria, validade: novo.cnhValidade } : null,
+    status: novo.status || "Ativo",
+    cnh: novo.cnhCategoria || novo.cnhNumero
+      ? { numero: novo.cnhNumero, categoria: novo.cnhCategoria, validade: novo.cnhValidade }
+      : null,
     nrs: novo.nrs ? novo.nrs.split(",").map((s) => s.trim()).filter(Boolean) : [],
     certificacoes: novo.certificacoes ? novo.certificacoes.split(",").map((s) => s.trim()).filter(Boolean) : [],
     equipamentos: novo.equipamentos ? novo.equipamentos.split(",").map((s) => s.trim()).filter(Boolean) : [],
+    // Vem preenchido quando o cadastro nasce do "Cadastro oficial" da Admissão
+    // Digital (documentos já anexados por lá); senão, começa vazio na aba Documentos.
+    documentos: novo.documentos ?? { anexos: {}, extras: [] },
+    dependentesNomes: novo.dependentesNomes ?? [],
   };
 }
 
 export default function CadastroColaboradores() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [colaboradores, setColaboradores] = useState(isSupabaseConfigured ? [] : COLABORADORES);
   const [carregando, setCarregando] = useState(isSupabaseConfigured);
   const [erroCarregamento, setErroCarregamento] = useState("");
@@ -55,6 +63,7 @@ export default function CadastroColaboradores() {
   const [formAberto, setFormAberto] = useState(false);
   const [formVisitado, setFormVisitado] = useState(false);
   const [colaboradorEditando, setColaboradorEditando] = useState(null);
+  const [dadosIniciaisForm, setDadosIniciaisForm] = useState(null);
   const [importAberto, setImportAberto] = useState(false);
   const [importVisitado, setImportVisitado] = useState(false);
   const [colaboradorParaExcluir, setColaboradorParaExcluir] = useState(null);
@@ -64,6 +73,9 @@ export default function CadastroColaboradores() {
   const [salvandoDesligamento, setSalvandoDesligamento] = useState(false);
   const [erroDesligamento, setErroDesligamento] = useState("");
   const [busca, setBusca] = useState("");
+  const [confirmarLimparTodos, setConfirmarLimparTodos] = useState(false);
+  const [limpandoTodos, setLimpandoTodos] = useState(false);
+  const [erroLimparTodos, setErroLimparTodos] = useState("");
 
   const colaboradoresFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -80,6 +92,18 @@ export default function CadastroColaboradores() {
       .catch((erro) => setErroCarregamento(erro.message))
       .finally(() => setCarregando(false));
   }, []);
+
+  // Chegando da Admissão Digital com "Cadastro oficial" — abre o formulário
+  // de novo colaborador já com os dados que a admissão tinha.
+  useEffect(() => {
+    const prefill = location.state?.prefillColaborador;
+    if (!prefill) return;
+    setColaboradorEditando(null);
+    setDadosIniciaisForm(prefill);
+    setFormVisitado(true);
+    setFormAberto(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
 
   function handleVerTimeline(colaborador, event) {
     if (selected?.id === colaborador.id && timelineAberta) {
@@ -99,10 +123,12 @@ export default function CadastroColaboradores() {
   function fecharForm() {
     setFormAberto(false);
     setColaboradorEditando(null);
+    setDadosIniciaisForm(null);
   }
 
   function handleEditar(colaborador) {
     setColaboradorEditando(colaborador);
+    setDadosIniciaisForm(null);
     setFormVisitado(true);
     setFormAberto(true);
   }
@@ -203,6 +229,30 @@ export default function CadastroColaboradores() {
     }
   }
 
+  function fecharModalLimparTodos() {
+    if (limpandoTodos) return;
+    setConfirmarLimparTodos(false);
+    setErroLimparTodos("");
+  }
+
+  async function handleConfirmarLimparTodos() {
+    setLimpandoTodos(true);
+    setErroLimparTodos("");
+    try {
+      if (isSupabaseConfigured) {
+        await excluirTodosColaboradoresRemoto();
+      }
+      setColaboradores([]);
+      setSelected(null);
+      setTimelineAberta(false);
+      setConfirmarLimparTodos(false);
+    } catch (erro) {
+      setErroLimparTodos(erro.message || "Erro ao limpar colaboradores.");
+    } finally {
+      setLimpandoTodos(false);
+    }
+  }
+
   async function handleImportarEmMassa(linhas) {
     if (isSupabaseConfigured) {
       const novos = await importarColaboradoresRemoto(linhas);
@@ -245,6 +295,7 @@ export default function CadastroColaboradores() {
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
             onClick={() => {
               setColaboradorEditando(null);
+              setDadosIniciaisForm(null);
               setFormVisitado(true);
               setFormAberto((v) => !v);
             }}
@@ -258,7 +309,12 @@ export default function CadastroColaboradores() {
         <div className="collapse-inner">
           {importVisitado && (
             <div className="collapse-content">
-              <ImportarColaboradoresForm onCancelar={() => setImportAberto(false)} onImportar={handleImportarEmMassa} />
+              <ImportarColaboradoresForm
+                onCancelar={() => setImportAberto(false)}
+                onImportar={handleImportarEmMassa}
+                totalColaboradores={colaboradores.length}
+                onLimparTodos={() => setConfirmarLimparTodos(true)}
+              />
             </div>
           )}
         </div>
@@ -269,8 +325,9 @@ export default function CadastroColaboradores() {
           {formVisitado && (
             <div className="collapse-content">
               <NovoColaboradorForm
-                key={colaboradorEditando?.id ?? "novo"}
+                key={colaboradorEditando?.id ?? (dadosIniciaisForm ? "novo-prefill" : "novo")}
                 colaborador={colaboradorEditando}
+                dadosIniciais={dadosIniciaisForm}
                 onCancelar={fecharForm}
                 onSalvar={handleSalvar}
               />
@@ -380,16 +437,32 @@ export default function CadastroColaboradores() {
                     <div style={{ fontSize: 13, marginTop: 4 }}>{selected.departamento} · {selected.centroCusto}</div>
                   </div>
                   <div>
-                    <div className="kpi-label">Equipe / Gestor</div>
-                    <div style={{ fontSize: 13, marginTop: 4 }}>{selected.equipe} · {selected.gestor}</div>
+                    <div className="kpi-label">Gestor</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>{selected.gestor || "—"}</div>
                   </div>
                   <div>
-                    <div className="kpi-label">Escolaridade / Dependentes</div>
-                    <div style={{ fontSize: 13, marginTop: 4 }}>{selected.escolaridade} · {selected.dependentes} dependente(s)</div>
+                    <div className="kpi-label">Dependentes</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>
+                      {selected.dependentesNomes?.length > 0
+                        ? selected.dependentesNomes.join(", ")
+                        : `${selected.dependentes || 0} dependente(s)`}
+                    </div>
                   </div>
                   <div>
                     <div className="kpi-label">Código Domínio</div>
                     <div style={{ fontSize: 13, marginTop: 4 }}>{selected.codigoDominio || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">CPF</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>{selected.cpf || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">Celular</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>{selected.celular || "—"}</div>
+                  </div>
+                  <div>
+                    <div className="kpi-label">E-mail</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>{selected.email || "—"}</div>
                   </div>
                 </div>
 
@@ -400,7 +473,7 @@ export default function CadastroColaboradores() {
                   </div>
                   {selected.cnh && (
                     <div className="timeline-item">
-                      <div className="timeline-date">CNH categoria {selected.cnh.categoria}</div>
+                      <div className="timeline-date">CNH {selected.cnh.categoria}{selected.cnh.numero ? ` — nº ${selected.cnh.numero}` : ""}</div>
                       <div className="timeline-desc">Válida até {selected.cnh.validade}.</div>
                     </div>
                   )}
@@ -435,6 +508,19 @@ export default function CadastroColaboradores() {
           erro={erroExclusao}
           onConfirmar={confirmarExclusao}
           onCancelar={fecharModalExclusao}
+        />
+      )}
+
+      {confirmarLimparTodos && (
+        <ConfirmDeleteModal
+          titulo="Limpar todos os colaboradores"
+          mensagem={`Tem certeza que deseja excluir todos os ${colaboradores.length} colaborador(es) cadastrados? Essa ação não pode ser desfeita.`}
+          confirmando={limpandoTodos}
+          erro={erroLimparTodos}
+          textoConfirmar="Limpar tudo"
+          textoConfirmando="Limpando…"
+          onConfirmar={handleConfirmarLimparTodos}
+          onCancelar={fecharModalLimparTodos}
         />
       )}
 

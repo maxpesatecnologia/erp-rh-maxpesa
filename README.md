@@ -2,8 +2,8 @@
 
 Protótipo funcional (React + Vite + CSS puro) da plataforma de Gestão Estratégica de Pessoas da Maxpesa —
 Dashboard Executivo, Cadastro de Colaboradores, Portal do Colaborador, Recrutamento & Seleção, Admissão Digital,
-Treinamentos, Operadores de Equipamentos, Segurança do Trabalho, Medicina Ocupacional, Gestão de EPIs, Gestão de
-Equipes (com bloqueio automático por pendência), Comunicação Interna e IA Corporativa.
+Documentos, Treinamentos, Operadores de Equipamentos, Segurança do Trabalho, Medicina Ocupacional, Gestão de
+EPIs, Gestão de Equipes (com bloqueio automático por pendência), Comunicação Interna e IA Corporativa.
 
 ## Rodando o projeto
 
@@ -154,11 +154,66 @@ A tela permite cancelar uma admissão (botão "×" no card, com confirmação) �
 Sem `.env` configurado (modo demo), a tela funciona do mesmo jeito, mas guarda as admissões só em memória
 (`src/lib/admissaoApi.js`) — elas somem ao recarregar a página, só para dar para navegar o fluxo sem backend.
 
+### Aba Documentos: repositório de documentos por colaborador
+
+A aba **Documentos** lista todos os colaboradores e, em "Ver documentos", mostra os mesmos documentos pessoais
+obrigatórios da Admissão Digital (`DOCUMENTOS_PESSOAIS_ADMISSAO` em `src/lib/admissaoApi.js`) para aquele
+colaborador — permitindo anexar/remover a qualquer momento, mesmo depois do cadastro pronto. Além dos
+obrigatórios, o RH pode digitar um nome e clicar em **"Criar documento"** dentro do modal para adicionar um
+documento extra específico daquele colaborador (ex.: "Atestado médico", "Termo de confidencialidade") — ele
+aparece na lista dali em diante, com seu próprio botão de anexar, e pode ser excluído por completo (ícone ao
+lado do anexo) caso tenha sido criado por engano. Documentos obrigatórios não podem ser excluídos, só
+anexados/removidos.
+
+Um dos obrigatórios, **"Documento do dependente"**, é `multiplo: true` — em vez de um único anexo, aceita
+vários arquivos no mesmo item (botão "Anexar outro"), pra cobrir o caso de mais de um dependente sem precisar
+de um item de checklist por pessoa. Qualquer documento pode virar `multiplo` bastando marcar a flag em
+`DOCUMENTOS_PESSOAIS_ADMISSAO` — o resto (contagem de anexados, upload, remoção por item) já lida com isso
+tanto na Admissão Digital quanto na aba Documentos (ver `documentoEhMultiplo` em `src/lib/admissaoApi.js`).
+
+Um colaborador criado a partir do **"Cadastro oficial"** da Admissão Digital já chega com os documentos que
+foram anexados durante o checklist de admissão (ver `handleCadastroOficial` em
+`src/pages/admissao/AdmissaoDigital.jsx`). Colaboradores cadastrados antes dessa integração — ou importados em
+massa — começam com a coluna vazia e ficam disponíveis para o RH atribuir os documentos manualmente pela aba.
+
+A coluna `documentos` guarda um objeto `{ anexos, extras }`: `anexos` é o mapa chave → arquivo (obrigatórios e
+extras usam o mesmo mapa), `extras` é a lista de documentos extras criados manualmente (`{ chave, label }`) —
+ver `src/pages/documentos/Documentos.jsx`.
+
+Para funcionar com o Supabase real, adicione a coluna `documentos` à tabela `rh_colaboradores`:
+
+```sql
+alter table rh_colaboradores add column if not exists documentos jsonb not null default '{"anexos": {}, "extras": []}';
+```
+
+Sem `.env` configurado (modo demo), a aba funciona do mesmo jeito, mas as alterações ficam só em memória
+(`src/pages/documentos/Documentos.jsx`) — somem ao recarregar a página.
+
+### Dependentes nomeados no Cadastro de Colaboradores
+
+O campo "Dependentes" do formulário de colaborador (`src/pages/colaboradores/NovoColaboradorForm.jsx`) não é
+mais uma quantidade solta: é uma lista de nomes, um campo por dependente, com um botão **"+ Adicionar
+dependente"** para incluir mais um e um "×" para remover. A contagem salva em `dependentes` é sempre calculada
+a partir dessa lista (nunca digitada direto). Colaboradores antigos que só tinham a contagem aparecem com essa
+quantidade de campos em branco, prontos para o RH preencher os nomes retroativamente.
+
+Para funcionar com o Supabase real, adicione a coluna `dependentes_nomes` à tabela `rh_colaboradores`:
+
+```sql
+alter table rh_colaboradores add column if not exists dependentes_nomes text[] not null default '{}';
+```
+
 ### Desligamento Digital é a lógica inversa da Admissão
 
 Mesmo padrão da Admissão, só que "de trás para frente": o Desligamento Digital não tem cadastro manual, ele nasce
 quando o RH clica em **"Desligar"** na linha de um colaborador ativo no Cadastro de Colaboradores. Isso cria uma
 linha na tabela `rh_desligamentos` com o checklist de saída zerado e marca o colaborador como "Desligado".
+
+A tela abre em **Kanban** por padrão: cada coluna é uma etapa do checklist (Entrevista → Devolução de equipamentos
+→ Exame demissional → Acerto rescisório), mais uma coluna final "Concluído". O colaborador só aparece na aba
+**Checklist** depois de passar por todas as etapas do Kanban e o RH clicar em "Enviar para o checklist" na coluna
+"Concluído" (`em_checklist` vira `true`) — mesmo padrão do botão "Efetivar contratação" do Kanban de Recrutamento.
+Clicando em qualquer card do Kanban abre um campo de observação livre (`observacao`), salvo por colaborador.
 
 ```sql
 create table rh_desligamentos (
@@ -170,12 +225,16 @@ create table rh_desligamentos (
     "entrevistaDesligamento": false,
     "devolucaoEquipamentos": false,
     "exameDemissional": false,
-    "acertoRescisorio": false,
-    "homologacaoSindicato": false,
-    "baixaDominio": false
+    "acertoRescisorio": false
   }',
+  em_checklist boolean not null default false,
+  observacao text,
   created_at timestamptz not null default now()
 );
+
+-- Se a tabela já existia antes dessas colunas:
+-- alter table rh_desligamentos add column if not exists em_checklist boolean not null default false;
+-- alter table rh_desligamentos add column if not exists observacao text;
 
 alter table rh_desligamentos enable row level security;
 
@@ -223,6 +282,109 @@ Clicar em "Desligar" também atualiza a coluna `status` do colaborador em `rh_co
 (`atualizarStatusColaborador` em `src/lib/colaboradoresApi.js`). O botão "Cancelar desligamento" na tela de
 Desligamento Digital reverte o processo por completo: apaga a linha em `rh_desligamentos` e volta o colaborador
 para "Ativo" — útil quando o desligamento foi iniciado por engano.
+
+### Gestão de Férias
+
+Diferente de Admissão/Desligamento, aqui existe um cadastro manual: o RH clica em **"Solicitar férias"**, escolhe
+o colaborador e o período — igual ao "Iniciar avaliação" da Avaliação de Desempenho. O saldo de dias disponíveis
+é **sempre calculado no front-end** (`src/lib/feriasCalculo.js`), nunca gravado como número solto: a cada 12 meses
+trabalhados desde a admissão (período aquisitivo) o colaborador tem direito a 30 dias, a gozar nos 12 meses
+seguintes (período concessivo). Passado o período concessivo sem gozo, o saldo aparece marcado como "Vencidas" na
+aba **Saldo de férias**.
+
+O fluxo de aprovação é de uma etapa só: toda solicitação nasce "Pendente" e só o RH aprova ou recusa (recusar exige
+motivo). Uma solicitação já **Aprovada** pode ser **prorrogada** — o RH define uma nova data de término e o motivo;
+o período/dias anteriores ficam guardados no histórico (`prorrogacoes`, dentro da própria linha) e a solicitação
+segue aprovada com a data nova. Também dá para **cancelar** uma aprovação (ex.: colaborador desistiu).
+
+```sql
+create table rh_ferias_solicitacoes (
+  id uuid primary key default gen_random_uuid(),
+  colaborador_id text not null, -- referencia rh_colaboradores.matricula
+  periodo_aquisitivo_inicio date not null,
+  periodo_aquisitivo_fim date not null,
+  data_inicio date not null,
+  data_fim date not null,
+  dias integer not null,
+  status text not null default 'Pendente', -- Pendente | Aprovada | Recusada | Cancelada
+  observacao_colaborador text,
+  observacao_rh text,
+  prorrogacoes jsonb not null default '[]',
+  created_at timestamptz not null default now()
+);
+
+alter table rh_ferias_solicitacoes enable row level security;
+
+create policy "admin e rh leem ferias"
+  on rh_ferias_solicitacoes for select
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "admin e rh criam ferias"
+  on rh_ferias_solicitacoes for insert
+  with check (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+
+create policy "admin e rh atualizam ferias"
+  on rh_ferias_solicitacoes for update
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+```
+
+Sem `.env` configurado (modo demo), a tela funciona do mesmo jeito, mas guarda as solicitações só em memória
+(`src/lib/feriasApi.js`) — somem ao recarregar a página, só para dar para navegar o fluxo sem backend.
+
+O widget "Férias da equipe" da Comunicação Interna (`src/pages/comunicacao/ComunicacaoInterna.jsx`) já usa essas
+mesmas solicitações aprovadas quando o Supabase está configurado — só cai no mock `FERIAS_EQUIPE` em modo demo.
+
+#### Ajuste manual de saldo (temporário, pra migração)
+
+Como o módulo é novo, tem gente que já está de férias (ou já tirou dias) sem nenhuma solicitação lançada aqui —
+o cálculo automático mostraria saldo cheio pra essas pessoas. Pra cobrir isso, a aba **Saldo de férias** tem um
+botão **"Ajustar saldo"** por colaborador: o RH informa quantos dias somar aos "usados" (e o motivo), e isso entra
+direto na conta em `feriasCalculo.js` — sem precisar reconstruir a solicitação retroativa. É pra ser temporário:
+depois que o histórico real estiver lançado como solicitações de verdade, zere o ajuste de volta a 0.
+
+```sql
+alter table rh_colaboradores add column if not exists ferias_ajuste_dias integer not null default 0;
+alter table rh_colaboradores add column if not exists ferias_ajuste_motivo text;
+```
+
+#### Cálculo de férias atrasadas (vencidas) e o "histórico zerado"
+
+A aba **Saldo de férias** também calcula automaticamente as **férias atrasadas**: pela CLT, se o período aquisitivo
+anterior ao atual não foi todo gozado dentro do seu prazo concessivo, aqueles dias ficam vencidos e devem ser pagos
+em dobro (art. 137). Isso aparece destacado no topo da aba, com colaborador, há quantos dias venceu, dias não
+gozados e uma **estimativa** de valor em dobro (`calcularValorEstimadoDobro` em `feriasCalculo.js` — dias × 1/3
+constitucional × 2; é só uma estimativa pro RH priorizar, confirme com o financeiro/DP antes de usar em folha).
+
+Isso olha **todos** os períodos aquisitivos anteriores ao atual, não só o mais recente — então um colaborador
+antigo, sem nenhuma solicitação lançada aqui (porque tirou férias normalmente antes deste sistema existir), vai
+aparecer com anos de "férias vencidas" por pura falta de registro, não porque isso realmente aconteceu. Pra esse
+caso, o mesmo modal **"Ajustar saldo"** tem um checkbox **"Sem pendência de férias de anos anteriores"** — marcar
+ele zera essa checagem de histórico pra aquele colaborador (`ferias_historico_ok`), e o cálculo passa a considerar
+só o período aquisitivo atual dali pra frente.
+
+```sql
+alter table rh_colaboradores add column if not exists ferias_historico_ok boolean not null default false;
+```
+
+Os painéis de autoatendimento do colaborador no Portal (`SolicitarFeriasPanel.jsx` / `SaldoFeriasPanel.jsx`) ainda
+**não** foram conectados a essa tabela: eles dependem de existir um vínculo entre o usuário autenticado (`rh_profiles`)
+e sua matrícula em `rh_colaboradores`, que hoje não existe em nenhum módulo do Portal — é um pré-requisito maior,
+compartilhado com os outros painéis de autoatendimento (dados cadastrais, banco de horas etc.), não só o de férias.
 
 ### Avaliação de Desempenho (proposta em validação com a gestão)
 

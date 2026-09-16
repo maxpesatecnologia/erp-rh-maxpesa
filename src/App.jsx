@@ -9,12 +9,13 @@ import Dashboard from "./pages/Dashboard";
 import CadastroColaboradores from "./pages/colaboradores/CadastroColaboradores";
 import PortalColaborador from "./pages/portal/PortalColaborador";
 import Recrutamento from "./pages/recrutamento/Recrutamento";
-import BancoCurriculos from "./pages/recrutamento/BancoCurriculos";
 import AdmissaoDigital from "./pages/admissao/AdmissaoDigital";
+import Documentos from "./pages/documentos/Documentos";
 import DesligamentoDigital from "./pages/desligamento/DesligamentoDigital";
+import GestaoFerias from "./pages/ferias/GestaoFerias";
 import Treinamentos from "./pages/treinamentos/Treinamentos";
 import AvaliacaoDesempenho from "./pages/avaliacao/AvaliacaoDesempenho";
-import OperadoresEquipamentos from "./pages/operadores/OperadoresEquipamentos";
+import Competencias from "./pages/competencias/Competencias";
 import SegurancaTrabalho from "./pages/seguranca/SegurancaTrabalho";
 import MedicinaOcupacional from "./pages/medicina/MedicinaOcupacional";
 import GestaoEPIs from "./pages/epis/GestaoEPIs";
@@ -39,12 +40,14 @@ export default function App() {
           <Route path="/colaboradores" element={withLayout(<CadastroColaboradores />)} />
           <Route path="/portal" element={withLayout(<PortalColaborador />)} />
           <Route path="/recrutamento" element={withLayout(<Recrutamento />)} />
-          <Route path="/recrutamento/banco-curriculos" element={withLayout(<BancoCurriculos />)} />
+          <Route path="/recrutamento/banco-curriculos" element={withLayout(<Recrutamento />)} />
           <Route path="/admissao" element={withLayout(<AdmissaoDigital />)} />
+          <Route path="/documentos" element={withLayout(<Documentos />)} />
           <Route path="/desligamento" element={withLayout(<DesligamentoDigital />)} />
+          <Route path="/ferias" element={withLayout(<GestaoFerias />)} />
           <Route path="/treinamentos" element={withLayout(<Treinamentos />)} />
           <Route path="/avaliacao-desempenho" element={withLayout(<AvaliacaoDesempenho />)} />
-          <Route path="/operadores" element={withLayout(<OperadoresEquipamentos />)} />
+          <Route path="/operadores" element={withLayout(<Competencias />)} />
           <Route path="/seguranca" element={withLayout(<SegurancaTrabalho />)} />
           <Route path="/medicina" element={withLayout(<MedicinaOcupacional />)} />
           <Route path="/epis" element={withLayout(<GestaoEPIs />)} />

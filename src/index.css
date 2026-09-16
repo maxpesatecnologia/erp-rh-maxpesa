@@ -665,6 +665,36 @@ input, select, textarea {
   margin-top: 14px;
 }
 
+.kpi-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.kpi-card-heading-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.kpi-card-heading span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .kpi-value {
   font-family: var(--font-heading);
   font-size: 32px;
@@ -1921,6 +1951,17 @@ table.data-table tbody tr:hover {
   font-weight: 600;
 }
 
+.competencia-chip-nr { border-left: 3px solid var(--color-warning); }
+.competencia-chip-certificação { border-left: 3px solid var(--color-accent); }
+.competencia-chip-equipamento { border-left: 3px solid var(--color-info, var(--color-accent)); }
+.competencia-chip-cnh { border-left: 3px solid var(--color-success); }
+
+.competencia-chip-match {
+  background: var(--color-accent-bg, var(--color-subtle));
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .client-chip {
   font-size: 11.5px;
   padding: 4px 10px;
@@ -2065,6 +2106,41 @@ table.data-table tbody tr:hover {
 .select-sm:focus {
   outline: none;
   border-color: var(--color-accent);
+}
+
+.periodo-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+}
+
+.periodo-filtro-icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.periodo-filtro select {
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.periodo-filtro select:focus {
+  outline: none;
+}
+
+.periodo-filtro-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--color-border-strong);
 }
 
 .seg-toggle {
@@ -2234,11 +2310,61 @@ table.data-table tbody tr:hover {
   background: var(--color-danger-bg) !important;
 }
 
-/* ---------- Kanban (recrutamento) ---------- */
+/* ---------- View switch (checklist / kanban toggle) ---------- */
+
+.view-switch {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--color-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  margin-bottom: 18px;
+}
+
+.view-switch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: calc(var(--radius-md) - 3px);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--dur-base) var(--ease-premium), color var(--dur-base) var(--ease-premium), box-shadow var(--dur-base) var(--ease-premium);
+}
+
+.view-switch-btn:hover {
+  color: var(--color-text);
+}
+
+.view-switch-btn.active {
+  background: var(--color-surface);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---------- Kanban (recrutamento / desligamento) ---------- */
 
 .kanban-column {
   min-height: 120px;
   transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.kanban-board {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.kanban-board .kanban-column {
+  flex: 1 1 240px;
+  min-width: 240px;
 }
 
 .kanban-column-over {

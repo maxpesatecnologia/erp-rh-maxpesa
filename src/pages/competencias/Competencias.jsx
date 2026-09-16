@@ -8,8 +8,7 @@ import { COLABORADORES } from "../../data/mock/colaboradores";
 import { listarColaboradores } from "../../lib/colaboradoresApi";
 import { isSupabaseConfigured } from "../../lib/supabaseClient";
 
-// Remove acentos pra comparar "Operação", "Operacional", "Operações" etc. sem
-// depender de como o RH digitou o departamento (campo é texto livre).
+// Remove acentos pra comparar termos de busca sem depender de como foram digitados.
 function normalizar(texto) {
   return String(texto || "")
     .normalize("NFD")
@@ -17,7 +16,20 @@ function normalizar(texto) {
     .toLowerCase();
 }
 
-export default function OperadoresEquipamentos() {
+// Junta NRs, certificações, equipamentos e CNH num único conjunto de
+// "competências" do colaborador, cada uma com um tipo pra exibir na legenda.
+function competenciasDoColaborador(colaborador) {
+  const lista = [];
+  (colaborador.nrs || []).forEach((valor) => lista.push({ tipo: "NR", valor }));
+  (colaborador.certificacoes || []).forEach((valor) => lista.push({ tipo: "Certificação", valor }));
+  (colaborador.equipamentos || []).forEach((valor) => lista.push({ tipo: "Equipamento", valor }));
+  if (colaborador.cnh?.categoria) {
+    lista.push({ tipo: "CNH", valor: `CNH ${colaborador.cnh.categoria}` });
+  }
+  return lista;
+}
+
+export default function Competencias() {
   const navigate = useNavigate();
   const [colaboradores, setColaboradores] = useState(isSupabaseConfigured ? [] : COLABORADORES);
   const [carregando, setCarregando] = useState(isSupabaseConfigured);
@@ -32,38 +44,42 @@ export default function OperadoresEquipamentos() {
       .finally(() => setCarregando(false));
   }, []);
 
-  const operadores = useMemo(() => {
-    return colaboradores.filter(
-      (c) => c.status !== "Desligado" && normalizar(c.departamento).includes("opera")
-    );
+  const pessoas = useMemo(() => {
+    return colaboradores
+      .filter((c) => c.status !== "Desligado")
+      .map((c) => ({ ...c, competencias: competenciasDoColaborador(c) }));
   }, [colaboradores]);
 
-  const operadoresFiltrados = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    if (!termo) return operadores;
-    return operadores.filter((c) =>
-      [c.nome, c.cargo, c.filial, ...(c.equipamentos || [])].some((campo) =>
-        String(campo || "").toLowerCase().includes(termo)
-      )
+  const termo = normalizar(busca.trim());
+
+  const pessoasFiltradas = useMemo(() => {
+    if (!termo) return pessoas;
+    return pessoas.filter(
+      (c) =>
+        normalizar(c.nome).includes(termo) ||
+        normalizar(c.cargo).includes(termo) ||
+        normalizar(c.filial).includes(termo) ||
+        c.competencias.some((comp) => normalizar(comp.valor).includes(termo))
     );
-  }, [operadores, busca]);
+  }, [pessoas, termo]);
 
   return (
     <div>
       <div className="page-header">
         <div>
-          <h1>Operadores de Equipamentos</h1>
+          <h1>Competências</h1>
           <div className="page-subtitle">
-            Colaboradores da operação e os equipamentos que cada um está habilitado a operar
+            Todos os colaboradores e as competências registradas — NRs, certificações, equipamentos
+            habilitados e CNH. Busque por uma competência para ver quem está habilitado.
           </div>
         </div>
       </div>
 
       <div className="card card-pad">
-        <div className="section-title">Operadores</div>
+        <div className="section-title">Colaboradores</div>
         <div style={{ fontSize: 12.5, color: "var(--color-text-muted)", marginBottom: 14 }}>
-          Lista puxada do cadastro de colaboradores (departamento contendo "Operação"). Para
-          incluir alguém aqui ou atualizar os equipamentos que opera, edite o colaborador em{" "}
+          Lista puxada do cadastro de colaboradores. Para incluir ou atualizar as competências de
+          alguém, edite o colaborador em{" "}
           <button
             type="button"
             onClick={() => navigate("/colaboradores")}
@@ -87,8 +103,8 @@ export default function OperadoresEquipamentos() {
             type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por nome, cargo, filial ou equipamento…"
-            aria-label="Buscar operador"
+            placeholder="Buscar por competência (ex: NR-35, Munck) ou por nome, cargo, filial…"
+            aria-label="Buscar competência ou colaborador"
           />
           {busca && (
             <button type="button" className="search-clear" onClick={() => setBusca("")} aria-label="Limpar busca">
@@ -96,11 +112,16 @@ export default function OperadoresEquipamentos() {
             </button>
           )}
         </div>
+        {termo && (
+          <div className="section-hint" style={{ marginBottom: 10 }}>
+            {pessoasFiltradas.length} colaborador(es) encontrado(s) para "{busca.trim()}".
+          </div>
+        )}
         {erroCarregamento && <div className="login-error" style={{ marginBottom: 14 }}>{erroCarregamento}</div>}
         {carregando ? (
-          <div className="section-hint">Carregando operadores…</div>
-        ) : operadoresFiltrados.length === 0 ? (
-          <div className="section-hint">Nenhum operador encontrado.</div>
+          <div className="section-hint">Carregando colaboradores…</div>
+        ) : pessoasFiltradas.length === 0 ? (
+          <div className="section-hint">Nenhum colaborador encontrado.</div>
         ) : (
           <DataTable
             columns={[
@@ -117,18 +138,24 @@ export default function OperadoresEquipamentos() {
               },
               { key: "cargo", label: "Cargo" },
               { key: "filial", label: "Filial" },
-              { key: "cnh", label: "CNH", render: (r) => (r.cnh ? `${r.cnh.categoria} (até ${r.cnh.validade})` : "—") },
               {
-                key: "equipamentos",
-                label: "Equipamentos que opera",
+                key: "competencias",
+                label: "Competências",
                 render: (r) =>
-                  r.equipamentos && r.equipamentos.length > 0 ? (
+                  r.competencias.length > 0 ? (
                     <div className="chip-row">
-                      {r.equipamentos.map((eq) => (
-                        <span className="equip-chip" key={eq}>
-                          {eq}
-                        </span>
-                      ))}
+                      {r.competencias.map((comp, i) => {
+                        const combina = termo && normalizar(comp.valor).includes(termo);
+                        return (
+                          <span
+                            className={`equip-chip competencia-chip-${comp.tipo.toLowerCase()}${combina ? " competencia-chip-match" : ""}`}
+                            key={`${comp.tipo}-${comp.valor}-${i}`}
+                            title={comp.tipo}
+                          >
+                            {comp.valor}
+                          </span>
+                        );
+                      })}
                     </div>
                   ) : (
                     "—"
@@ -136,7 +163,7 @@ export default function OperadoresEquipamentos() {
               },
               { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
             ]}
-            rows={operadoresFiltrados}
+            rows={pessoasFiltradas}
           />
         )}
       </div>

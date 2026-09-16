@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { UploadCloud, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import DataTable from "../../components/DataTable";
@@ -9,15 +9,18 @@ import { isSupabaseConfigured } from "../../lib/supabaseClient";
 const COLUNAS_MODELO = [
   "nome",
   "codigoDominio",
+  "cpf",
+  "celular",
+  "email",
   "cargo",
   "departamento",
   "filial",
   "centroCusto",
   "gestor",
-  "equipe",
   "admissao",
-  "escolaridade",
+  "salario",
   "dependentes",
+  "cnhNumero",
   "cnhCategoria",
   "cnhValidade",
   "nrs",
@@ -25,24 +28,25 @@ const COLUNAS_MODELO = [
   "equipamentos",
 ];
 
-const LINHA_EXEMPLO = [
-  "Fernanda Costa",
-  "DOM-10099",
-  "Auxiliar Administrativo",
-  "Recursos Humanos",
-  "Matriz - Campinas",
-  "CC-101",
-  "Ana Ribeiro",
-  "RH Corporativo",
-  "2026-09-15",
-  "Ensino Médio Completo",
-  "1",
-  "",
-  "",
-  "",
-  "",
-  "",
-];
+// Normaliza nome de coluna pra comparar sem se importar com maiúscula/minúscula
+// ou acento (ex.: "Admissão" e "Salario" batem com "admissao" e "salario").
+function normalizarNomeColuna(valor) {
+  return String(valor ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+}
+
+// Troca os nomes do cabeçalho do arquivo pelos nomes canônicos usados no
+// resto do sistema (ex.: "Admissão" vira "admissao"), quando reconhecidos.
+function mapearCabecalho(cabecalho) {
+  const porNomeNormalizado = new Map(
+    COLUNAS_MODELO.map((campo) => [normalizarNomeColuna(campo), campo])
+  );
+  return cabecalho.map((coluna) => porNomeNormalizado.get(normalizarNomeColuna(coluna)) ?? coluna);
+}
 
 function detectarDelimitador(linhaCabecalho) {
   const pontoEVirgula = (linhaCabecalho.match(/;/g) || []).length;
@@ -89,7 +93,7 @@ function parseCSV(texto) {
   const linhas = semBom.split(/\r\n|\n/).filter((l) => l.trim() !== "");
   if (linhas.length === 0) return { cabecalho: [], linhas: [] };
   const delimitador = detectarDelimitador(linhas[0]);
-  const cabecalho = parseLinhaCSV(linhas[0], delimitador);
+  const cabecalho = mapearCabecalho(parseLinhaCSV(linhas[0], delimitador));
   const linhasDados = linhas.slice(1).map((linha) => {
     const valores = parseLinhaCSV(linha, delimitador);
     const registro = {};
@@ -106,7 +110,7 @@ function parseCSV(texto) {
 function linhasParaRegistros(matriz) {
   const linhas = matriz.filter((linha) => linha.some((c) => String(c ?? "").trim() !== ""));
   if (linhas.length === 0) return { cabecalho: [], linhas: [] };
-  const cabecalho = linhas[0].map((c) => String(c ?? "").trim());
+  const cabecalho = mapearCabecalho(linhas[0].map((c) => String(c ?? "").trim()));
   const linhasDados = linhas.slice(1).map((linha) => {
     const registro = {};
     cabecalho.forEach((campo, i) => {
@@ -143,6 +147,20 @@ function celulaParaTexto(cell) {
   return String(cell.v).trim();
 }
 
+// Colunas numéricas: usamos o valor bruto da célula (célula.v) em vez do
+// texto formatado, porque colunas com fórmula (ex.: VLOOKUP de salário) não
+// têm o texto formatado em cache — o fallback pra SSF.format monta o número
+// com separadores no padrão americano (vírgula de milhar), o que ambiguava
+// com o formato BR ao reinterpretar o texto depois (ex.: "R$ 3,000.00"
+// virava 3 em vez de 3000). Pegando o número puro, essa ambiguidade não existe.
+const CAMPOS_NUMERICOS = ["salario", "dependentes"];
+
+function celulaParaValorNumerico(cell) {
+  if (!cell) return "";
+  if (cell.t === "n" && typeof cell.v === "number") return String(cell.v);
+  return celulaParaTexto(cell);
+}
+
 // Lê a primeira planilha de um arquivo .xlsx/.xls célula a célula (em vez de
 // usar sheet_to_json com raw:false), pra conseguir cair pro valor bruto quando
 // o texto formatado não estiver em cache no arquivo.
@@ -151,34 +169,80 @@ function parseExcel(arrayBuffer) {
   const primeiraAba = workbook.Sheets[workbook.SheetNames[0]];
   if (!primeiraAba["!ref"]) return { cabecalho: [], linhas: [] };
   const intervalo = XLSX.utils.decode_range(primeiraAba["!ref"]);
-  const matriz = [];
-  for (let linha = intervalo.s.r; linha <= intervalo.e.r; linha++) {
+
+  const cabecalhoBruto = [];
+  for (let coluna = intervalo.s.c; coluna <= intervalo.e.c; coluna++) {
+    const endereco = XLSX.utils.encode_cell({ r: intervalo.s.r, c: coluna });
+    cabecalhoBruto.push(celulaParaTexto(primeiraAba[endereco]));
+  }
+  const cabecalhoMapeado = mapearCabecalho(cabecalhoBruto);
+  const indicesNumericos = new Set(
+    cabecalhoMapeado.map((campo, i) => (CAMPOS_NUMERICOS.includes(campo) ? i : -1)).filter((i) => i >= 0)
+  );
+
+  const matriz = [cabecalhoBruto];
+  for (let linha = intervalo.s.r + 1; linha <= intervalo.e.r; linha++) {
     const valoresLinha = [];
     for (let coluna = intervalo.s.c; coluna <= intervalo.e.c; coluna++) {
       const endereco = XLSX.utils.encode_cell({ r: linha, c: coluna });
-      valoresLinha.push(celulaParaTexto(primeiraAba[endereco]));
+      const cell = primeiraAba[endereco];
+      const indiceRelativo = coluna - intervalo.s.c;
+      valoresLinha.push(
+        indicesNumericos.has(indiceRelativo) ? celulaParaValorNumerico(cell) : celulaParaTexto(cell)
+      );
     }
     matriz.push(valoresLinha);
   }
   return linhasParaRegistros(matriz);
 }
 
-// Aceita AAAA-MM-DD (padrão interno) e DD/MM/AAAA (comum em export de Excel BR).
+// Aceita valor monetário em formato BR (ex.: "R$ 3.000,00", "3.000,00") e
+// também formato simples (ex.: "3000", "3000.50"), retornando string numérica
+// pronta pra Number(). Remove símbolo de moeda e usa vírgula como decimal
+// quando presente (nesse caso ponto é separador de milhar).
+function normalizarValorMonetario(valor) {
+  const texto = String(valor ?? "").trim();
+  if (!texto) return "";
+  let limpo = texto.replace(/[^\d.,-]/g, "");
+  if (!limpo) return "";
+  if (limpo.includes(",")) {
+    limpo = limpo.replace(/\./g, "").replace(",", ".");
+  } else if (/^-?\d{1,3}(\.\d{3})+$/.test(limpo)) {
+    limpo = limpo.replace(/\./g, "");
+  }
+  return limpo;
+}
+
+// Aceita AAAA-MM-DD (padrão interno) e D/M/AAAA ou DD/MM/AAAA (comum em
+// export de Excel BR). Valida o calendário (rejeita "31/02/2025" etc.) —
+// datas inválidas nunca podem ir pro banco, senão o Postgres rejeita o
+// insert inteiro com "date/time field value out of range".
 function normalizarData(valor) {
   if (!valor) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) return valor;
-  const match = valor.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+    const [ano, mes, dia] = valor.split("-").map(Number);
+    return dataValida(ano, mes, dia) ? valor : null;
+  }
+  const match = valor.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (match) {
     const [, d, m, a] = match;
-    return `${a}-${m}-${d}`;
+    if (!dataValida(Number(a), Number(m), Number(d))) return null;
+    return `${a}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
   return null;
 }
 
-// filial, gestor, cargo e admissao podem chegar em branco na importação
-// (preenchidos depois, diretamente no cadastro) — só nome e departamento
-// bloqueiam a linha. admissao, quando informada, ainda precisa ser uma data válida.
-const CAMPOS_OPCIONAIS_NA_IMPORTACAO = ["filial", "gestor", "cargo", "admissao"];
+function dataValida(ano, mes, dia) {
+  if (!Number.isInteger(ano) || !Number.isInteger(mes) || !Number.isInteger(dia)) return false;
+  if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return false;
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  return data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia;
+}
+
+// filial, cargo e admissao podem chegar em branco na importação (preenchidos
+// depois, diretamente no cadastro) — os demais campos obrigatórios bloqueiam
+// a linha. admissao, quando informada, ainda precisa ser uma data válida.
+const CAMPOS_OPCIONAIS_NA_IMPORTACAO = ["filial", "cargo", "admissao"];
 
 function validarLinha(registro) {
   const erros = [];
@@ -193,22 +257,40 @@ function validarLinha(registro) {
     admissaoNormalizada = normalizarData(admissaoBruta);
     if (!admissaoNormalizada) erros.push('"admissao" inválida (use AAAA-MM-DD ou DD/MM/AAAA)');
   }
-  return { erros, admissaoNormalizada };
+  const salarioBruto = String(registro.salario ?? "").trim();
+  let salarioNormalizado = null;
+  if (salarioBruto) {
+    salarioNormalizado = normalizarValorMonetario(salarioBruto);
+    if (!salarioNormalizado || !Number.isFinite(Number(salarioNormalizado)) || Number(salarioNormalizado) <= 0) {
+      erros.push('"salario" inválido (informe um número maior que zero)');
+    }
+  }
+  const cnhValidadeBruta = String(registro.cnhValidade ?? "").trim();
+  let cnhValidadeNormalizada = null;
+  if (cnhValidadeBruta) {
+    cnhValidadeNormalizada = normalizarData(cnhValidadeBruta);
+    if (!cnhValidadeNormalizada) erros.push('"cnhValidade" inválida (use AAAA-MM-DD ou DD/MM/AAAA)');
+  }
+  return { erros, admissaoNormalizada, salarioNormalizado, cnhValidadeNormalizada };
 }
 
-export default function ImportarColaboradoresForm({ onImportar, onCancelar }) {
+export default function ImportarColaboradoresForm({ onImportar, onCancelar, onLimparTodos, totalColaboradores = 0 }) {
   const [arquivo, setArquivo] = useState(null);
   const [linhasProcessadas, setLinhasProcessadas] = useState(null);
   const [erroArquivo, setErroArquivo] = useState("");
   const [importando, setImportando] = useState(false);
 
-  const modeloUrl = useMemo(() => {
-    const conteudo = [COLUNAS_MODELO.join(","), LINHA_EXEMPLO.join(",")].join("\n");
-    const blob = new Blob([conteudo], { type: "text/csv;charset=utf-8;" });
-    return URL.createObjectURL(blob);
-  }, []);
-
-  useEffect(() => () => URL.revokeObjectURL(modeloUrl), [modeloUrl]);
+  // .xlsx em vez de .csv: CSV depende de separador/encoding que o Excel
+  // interpreta de formas diferentes dependendo do idioma/config do usuário
+  // (no pt-BR, por exemplo, a vírgula é separador decimal, não de coluna) —
+  // gerava arquivo "corrompido" pra quem abrisse direto no Excel. .xlsx é um
+  // formato binário, sem essa ambiguidade.
+  function baixarModelo() {
+    const planilha = XLSX.utils.aoa_to_sheet([COLUNAS_MODELO]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, planilha, "Modelo");
+    XLSX.writeFile(workbook, "modelo_importacao_colaboradores.xlsx");
+  }
 
   function processarRegistros(cabecalho, linhas) {
     const colunasFaltando = CAMPOS_OBRIGATORIOS.filter((c) => !cabecalho.includes(c));
@@ -217,8 +299,16 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar }) {
       return;
     }
     const processadas = linhas.map((registro) => {
-      const { erros, admissaoNormalizada } = validarLinha(registro);
-      return { dados: { ...registro, admissao: admissaoNormalizada ?? registro.admissao }, erros };
+      const { erros, admissaoNormalizada, salarioNormalizado, cnhValidadeNormalizada } = validarLinha(registro);
+      return {
+        dados: {
+          ...registro,
+          admissao: admissaoNormalizada ?? registro.admissao,
+          salario: salarioNormalizado ?? registro.salario,
+          cnhValidade: cnhValidadeNormalizada ?? registro.cnhValidade,
+        },
+        erros,
+      };
     });
     setLinhasProcessadas(processadas);
   }
@@ -285,14 +375,24 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar }) {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-        <a
+        <button
+          type="button"
           className="btn btn-outline"
-          href={modeloUrl}
-          download="modelo_importacao_colaboradores.csv"
+          onClick={baixarModelo}
           style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
         >
-          <Download size={14} /> Baixar modelo CSV
-        </a>
+          <Download size={14} /> Baixar modelo Excel
+        </button>
+        {onLimparTodos && totalColaboradores > 0 && (
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={onLimparTodos}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--color-danger)" }}
+          >
+            Limpar colaboradores atuais ({totalColaboradores})
+          </button>
+        )}
         <span className="section-hint">
           Colunas obrigatórias: {CAMPOS_OBRIGATORIOS.filter((c) => !CAMPOS_OPCIONAIS_NA_IMPORTACAO.includes(c)).join(", ")}.
           {" "}(as demais — {CAMPOS_OPCIONAIS_NA_IMPORTACAO.join(", ")} — podem ficar em branco e ser preenchidas depois.)

@@ -12,6 +12,7 @@ const MAP = {
   pendente: "warning",
   em_andamento: "warning",
   aguardando: "warning",
+  afastado: "warning",
 
   vencido: "danger",
   bloqueado: "danger",

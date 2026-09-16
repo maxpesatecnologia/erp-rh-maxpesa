@@ -1,3 +1,9 @@
+export function formatMoeda(valor) {
+  const numero = Number(valor);
+  if (!Number.isFinite(numero)) return "—";
+  return numero.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 export function formatDate(iso) {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
