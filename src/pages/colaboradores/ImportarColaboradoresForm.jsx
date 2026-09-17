@@ -6,6 +6,9 @@ import StatusBadge from "../../components/StatusBadge";
 import { CAMPOS_OBRIGATORIOS } from "./NovoColaboradorForm";
 import { isSupabaseConfigured } from "../../lib/supabaseClient";
 
+// "dependente1".."dependente6" são só um ponto de partida no modelo baixável —
+// a importação aceita quantas colunas "dependenteN" o arquivo trouxer (dependente7,
+// dependente8, ...), sem limite, já que uma pessoa pode ter mais de 6 dependentes.
 const COLUNAS_MODELO = [
   "nome",
   "codigoDominio",
@@ -18,8 +21,14 @@ const COLUNAS_MODELO = [
   "centroCusto",
   "gestor",
   "admissao",
+  "dataDemissao",
   "salario",
-  "dependentes",
+  "dependente1",
+  "dependente2",
+  "dependente3",
+  "dependente4",
+  "dependente5",
+  "dependente6",
   "cnhNumero",
   "cnhCategoria",
   "cnhValidade",
@@ -39,13 +48,47 @@ function normalizarNomeColuna(valor) {
     .replace(/[\s_-]+/g, "");
 }
 
+// Casa "Dependente 1", "dependente_7", "DEPENDENTE12" etc. — qualquer número,
+// não só os 6 listados no modelo baixável.
+const REGEX_COLUNA_DEPENDENTE = /^dependente(\d+)$/;
+
 // Troca os nomes do cabeçalho do arquivo pelos nomes canônicos usados no
 // resto do sistema (ex.: "Admissão" vira "admissao"), quando reconhecidos.
+// Colunas "dependenteN" além das 6 do modelo também são reconhecidas, pra não
+// haver limite de dependentes por planilha.
 function mapearCabecalho(cabecalho) {
   const porNomeNormalizado = new Map(
     COLUNAS_MODELO.map((campo) => [normalizarNomeColuna(campo), campo])
   );
-  return cabecalho.map((coluna) => porNomeNormalizado.get(normalizarNomeColuna(coluna)) ?? coluna);
+  return cabecalho.map((coluna) => {
+    const normalizado = normalizarNomeColuna(coluna);
+    if (porNomeNormalizado.has(normalizado)) return porNomeNormalizado.get(normalizado);
+    if (REGEX_COLUNA_DEPENDENTE.test(normalizado)) return normalizado;
+    return coluna;
+  });
+}
+
+// Junta as colunas "dependenteN" (em qualquer quantidade) da linha num único
+// array `dependentesNomes`, na ordem, ignorando as vazias — mesmo formato usado
+// pelo cadastro manual (NovoColaboradorForm). `dependentes` vira a contagem,
+// calculada a partir da lista, nunca digitada solta na planilha.
+function extrairDependentes(registro) {
+  const nomes = Object.keys(registro)
+    .map((chave) => {
+      const match = chave.match(REGEX_COLUNA_DEPENDENTE);
+      return match ? { indice: Number(match[1]), valor: String(registro[chave] ?? "").trim() } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.indice - b.indice)
+    .map((d) => d.valor)
+    .filter(Boolean);
+
+  const resto = { ...registro };
+  Object.keys(resto).forEach((chave) => {
+    if (REGEX_COLUNA_DEPENDENTE.test(chave)) delete resto[chave];
+  });
+
+  return { ...resto, dependentesNomes: nomes, dependentes: nomes.length };
 }
 
 function detectarDelimitador(linhaCabecalho) {
@@ -153,7 +196,7 @@ function celulaParaTexto(cell) {
 // com separadores no padrão americano (vírgula de milhar), o que ambiguava
 // com o formato BR ao reinterpretar o texto depois (ex.: "R$ 3,000.00"
 // virava 3 em vez de 3000). Pegando o número puro, essa ambiguidade não existe.
-const CAMPOS_NUMERICOS = ["salario", "dependentes"];
+const CAMPOS_NUMERICOS = ["salario"];
 
 function celulaParaValorNumerico(cell) {
   if (!cell) return "";
@@ -257,6 +300,16 @@ function validarLinha(registro) {
     admissaoNormalizada = normalizarData(admissaoBruta);
     if (!admissaoNormalizada) erros.push('"admissao" inválida (use AAAA-MM-DD ou DD/MM/AAAA)');
   }
+  // Preencher "dataDemissao" é o que marca a linha como colaborador desligado:
+  // ao importar, o status vira "Desligado" e um registro em Desligamento
+  // Digital é criado automaticamente com essa data (mesmo fluxo do botão
+  // "Desligar" manual). Em branco, o colaborador entra como "Ativo" normalmente.
+  const dataDemissaoBruta = String(registro.dataDemissao ?? "").trim();
+  let dataDemissaoNormalizada = null;
+  if (dataDemissaoBruta) {
+    dataDemissaoNormalizada = normalizarData(dataDemissaoBruta);
+    if (!dataDemissaoNormalizada) erros.push('"dataDemissao" inválida (use AAAA-MM-DD ou DD/MM/AAAA)');
+  }
   const salarioBruto = String(registro.salario ?? "").trim();
   let salarioNormalizado = null;
   if (salarioBruto) {
@@ -271,7 +324,7 @@ function validarLinha(registro) {
     cnhValidadeNormalizada = normalizarData(cnhValidadeBruta);
     if (!cnhValidadeNormalizada) erros.push('"cnhValidade" inválida (use AAAA-MM-DD ou DD/MM/AAAA)');
   }
-  return { erros, admissaoNormalizada, salarioNormalizado, cnhValidadeNormalizada };
+  return { erros, admissaoNormalizada, dataDemissaoNormalizada, salarioNormalizado, cnhValidadeNormalizada };
 }
 
 export default function ImportarColaboradoresForm({ onImportar, onCancelar, onLimparTodos, totalColaboradores = 0 }) {
@@ -298,12 +351,16 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar, onLi
       setErroArquivo(`Arquivo sem as colunas obrigatórias: ${colunasFaltando.join(", ")}.`);
       return;
     }
-    const processadas = linhas.map((registro) => {
-      const { erros, admissaoNormalizada, salarioNormalizado, cnhValidadeNormalizada } = validarLinha(registro);
+    const processadas = linhas.map((linha) => {
+      const registro = extrairDependentes(linha);
+      const { erros, admissaoNormalizada, dataDemissaoNormalizada, salarioNormalizado, cnhValidadeNormalizada } =
+        validarLinha(registro);
       return {
         dados: {
           ...registro,
           admissao: admissaoNormalizada ?? registro.admissao,
+          dataDemissao: dataDemissaoNormalizada,
+          status: dataDemissaoNormalizada ? "Desligado" : "Ativo",
           salario: salarioNormalizado ?? registro.salario,
           cnhValidade: cnhValidadeNormalizada ?? registro.cnhValidade,
         },
@@ -396,6 +453,7 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar, onLi
         <span className="section-hint">
           Colunas obrigatórias: {CAMPOS_OBRIGATORIOS.filter((c) => !CAMPOS_OPCIONAIS_NA_IMPORTACAO.includes(c)).join(", ")}.
           {" "}(as demais — {CAMPOS_OPCIONAIS_NA_IMPORTACAO.join(", ")} — podem ficar em branco e ser preenchidas depois.)
+          {" "}Preencher "dataDemissao" marca o colaborador como Desligado automaticamente.
         </span>
       </div>
 
@@ -424,6 +482,12 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar, onLi
               { key: "cargo", label: "Cargo", render: (r) => r.dados.cargo || "—" },
               { key: "filial", label: "Filial", render: (r) => r.dados.filial || "—" },
               { key: "admissao", label: "Admissão", render: (r) => r.dados.admissao || "—" },
+              {
+                key: "situacao",
+                label: "Situação",
+                render: (r) =>
+                  r.dados.status === "Desligado" ? `Desligado em ${r.dados.dataDemissao}` : "Ativo",
+              },
               {
                 key: "status",
                 label: "Status",

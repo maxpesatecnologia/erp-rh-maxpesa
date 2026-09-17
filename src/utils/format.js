@@ -1,3 +1,11 @@
+// Nome oficial da filial é longo demais pra exibir nas telas; aqui só encurta
+// pra exibição, o valor salvo no banco continua o nome completo.
+export function formatFilial(filial) {
+  if (!filial) return filial;
+  if (filial.toUpperCase().startsWith("SARENS")) return "SARENS";
+  return filial.toUpperCase();
+}
+
 export function formatMoeda(valor) {
   const numero = Number(valor);
   if (!Number.isFinite(numero)) return "—";
@@ -8,6 +16,19 @@ export function formatDate(iso) {
   if (!iso) return "—";
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
+}
+
+export function formatDataHora(isoDatetime) {
+  if (!isoDatetime) return "—";
+  const data = new Date(isoDatetime);
+  if (Number.isNaN(data.getTime())) return "—";
+  return data.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function formatDiaMes(iso) {

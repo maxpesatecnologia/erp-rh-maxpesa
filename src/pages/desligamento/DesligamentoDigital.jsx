@@ -10,14 +10,17 @@ import {
   Paperclip,
   Users,
   Upload,
+  History,
 } from "lucide-react";
 import Avatar from "../../components/Avatar";
 import DataTable from "../../components/DataTable";
 import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
 import ObservacaoDesligamentoModal from "./ObservacaoDesligamentoModal";
+import HistoricoEtapasModal from "../../components/HistoricoEtapasModal";
 import AnexarDocumentosModal from "../../components/AnexarDocumentosModal";
 import ImportarDesligamentosForm from "./ImportarDesligamentosForm";
 import { COLABORADORES } from "../../data/mock/colaboradores";
+import { useAuth } from "../../context/AuthContext";
 import { isSupabaseConfigured } from "../../lib/supabaseClient";
 import { listarColaboradores, atualizarStatusColaborador } from "../../lib/colaboradoresApi";
 import {
@@ -30,7 +33,7 @@ import {
   DOCUMENTOS_ETAPAS_DESLIGAMENTO,
 } from "../../lib/desligamentoApi";
 import { anexarDocumentoChecklist, removerDocumentoChecklist } from "../../lib/documentosChecklistApi";
-import { formatDate } from "../../utils/format";
+import { formatDate, formatFilial } from "../../utils/format";
 
 const CHECKLIST_LABELS = {
   entrevistaDesligamento: "Entrevista de desligamento",
@@ -45,9 +48,30 @@ const COLUNAS_KANBAN = [
   ...ETAPAS_KANBAN.map((chave) => ({ id: chave, titulo: CHECKLIST_LABELS[chave] })),
   { id: COLUNA_CONCLUIDO, titulo: "Concluído" },
 ];
+const TITULOS_COLUNA = Object.fromEntries(COLUNAS_KANBAN.map((c) => [c.id, c.titulo]));
 
 function getColunaAtual(checklist) {
   return ETAPAS_KANBAN.find((chave) => !checklist[chave]) ?? COLUNA_CONCLUIDO;
+}
+
+function criarEntradaHistorico(descricao, user) {
+  return {
+    descricao,
+    data: new Date().toISOString(),
+    usuarioId: user?.id ?? null,
+    usuarioNome: user?.nome ?? "Usuário desconhecido",
+  };
+}
+
+// Toda ação que altera o checklist (arrastar no Kanban, marcar etapa manualmente
+// ou anexar/remover documento) pode mudar a "etapa atual" derivada — quando isso
+// acontece, registramos automaticamente quem moveu o card e quando.
+function comHistoricoDeMovimento(desligamento, checklistNovo, user) {
+  const colunaAntes = getColunaAtual(desligamento.checklist);
+  const colunaDepois = getColunaAtual(checklistNovo);
+  if (colunaAntes === colunaDepois) return desligamento.historico || [];
+  const descricao = `Movido de "${TITULOS_COLUNA[colunaAntes]}" para "${TITULOS_COLUNA[colunaDepois]}"`;
+  return [...(desligamento.historico || []), criarEntradaHistorico(descricao, user)];
 }
 
 function getStatus(pct) {
@@ -57,6 +81,7 @@ function getStatus(pct) {
 }
 
 export default function DesligamentoDigital() {
+  const { user } = useAuth();
   const [colaboradores, setColaboradores] = useState(isSupabaseConfigured ? [] : COLABORADORES);
   const [desligamentos, setDesligamentos] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -73,9 +98,11 @@ export default function DesligamentoDigital() {
   const [documentoEtapa, setDocumentoEtapa] = useState(null);
   const [importAberto, setImportAberto] = useState(false);
   const [importVisitado, setImportVisitado] = useState(false);
+  const [historicoId, setHistoricoId] = useState(null);
 
   const desligamentosNoChecklist = desligamentos.filter((d) => d.emChecklist);
   const desligamentoObservando = desligamentos.find((d) => d.id === desligamentoObservandoId) ?? null;
+  const desligamentoHistorico = desligamentos.find((d) => d.id === historicoId) ?? null;
   const desligamentoDocumento = documentoEtapa
     ? desligamentos.find((d) => d.id === documentoEtapa.desligamentoId) ?? null
     : null;
@@ -98,41 +125,53 @@ export default function DesligamentoDigital() {
       return;
     }
     const checklistAnterior = desligamento.checklist;
+    const historicoAnterior = desligamento.historico || [];
     const checklist = { ...checklistAnterior, [chave]: !checklistAnterior[chave] };
-    setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist } : d)));
+    const historico = comHistoricoDeMovimento(desligamento, checklist, user);
+    setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist, historico } : d)));
     try {
-      await atualizarChecklistDesligamento(desligamento.id, checklist);
+      await atualizarChecklistDesligamento(desligamento.id, checklist, historico);
     } catch (e) {
-      setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior } : d)));
+      setDesligamentos((atual) =>
+        atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior, historico: historicoAnterior } : d))
+      );
       setErro(e.message || "Erro ao atualizar etapa.");
     }
   }
 
   async function handleAnexarDocumentoEtapa(desligamento, chave, arquivo) {
     const checklistAnterior = desligamento.checklist;
+    const historicoAnterior = desligamento.historico || [];
     const anexoChave = `${chave}Anexo`;
     const anexo = await anexarDocumentoChecklist(`desligamento/${desligamento.id}`, arquivo);
     const checklist = { ...checklistAnterior, [anexoChave]: anexo, [chave]: true };
-    setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist } : d)));
+    const historico = comHistoricoDeMovimento(desligamento, checklist, user);
+    setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist, historico } : d)));
     try {
-      await atualizarChecklistDesligamento(desligamento.id, checklist);
+      await atualizarChecklistDesligamento(desligamento.id, checklist, historico);
     } catch (e) {
-      setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior } : d)));
+      setDesligamentos((atual) =>
+        atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior, historico: historicoAnterior } : d))
+      );
       throw e;
     }
   }
 
   async function handleRemoverDocumentoEtapa(desligamento, chave) {
     const checklistAnterior = desligamento.checklist;
+    const historicoAnterior = desligamento.historico || [];
     const anexoChave = `${chave}Anexo`;
     const anexoAtual = checklistAnterior[anexoChave];
     const checklist = { ...checklistAnterior, [anexoChave]: null, [chave]: false };
-    setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist } : d)));
+    const historico = comHistoricoDeMovimento(desligamento, checklist, user);
+    setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist, historico } : d)));
     try {
       await removerDocumentoChecklist(anexoAtual?.path);
-      await atualizarChecklistDesligamento(desligamento.id, checklist);
+      await atualizarChecklistDesligamento(desligamento.id, checklist, historico);
     } catch (e) {
-      setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior } : d)));
+      setDesligamentos((atual) =>
+        atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior, historico: historicoAnterior } : d))
+      );
       throw e;
     }
   }
@@ -145,6 +184,7 @@ export default function DesligamentoDigital() {
 
     const indiceAlvo = colunaId === COLUNA_CONCLUIDO ? ETAPAS_KANBAN.length : ETAPAS_KANBAN.indexOf(colunaId);
     const checklistAnterior = desligamento.checklist;
+    const historicoAnterior = desligamento.historico || [];
 
     const etapaSemAnexo = ETAPAS_KANBAN.slice(0, indiceAlvo).find(
       (chave) => DOCUMENTOS_ETAPAS_DESLIGAMENTO[chave] && !checklistAnterior[`${chave}Anexo`]
@@ -158,9 +198,12 @@ export default function DesligamentoDigital() {
     ETAPAS_KANBAN.forEach((chave, i) => {
       checklist[chave] = i < indiceAlvo;
     });
-    setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist } : d)));
-    atualizarChecklistDesligamento(desligamento.id, checklist).catch((e) => {
-      setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior } : d)));
+    const historico = comHistoricoDeMovimento(desligamento, checklist, user);
+    setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist, historico } : d)));
+    atualizarChecklistDesligamento(desligamento.id, checklist, historico).catch((e) => {
+      setDesligamentos((atual) =>
+        atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior, historico: historicoAnterior } : d))
+      );
       setErro(e.message || "Erro ao mover etapa.");
     });
   }
@@ -173,6 +216,10 @@ export default function DesligamentoDigital() {
       setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, emChecklist: false } : d)));
       setErro(e.message || "Erro ao enviar para o checklist.");
     }
+  }
+
+  function abrirHistorico(desligamento) {
+    setHistoricoId(desligamento.id);
   }
 
   function abrirObservacao(desligamento) {
@@ -445,6 +492,26 @@ export default function DesligamentoDigital() {
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
+                          abrirHistorico(desl);
+                        }}
+                      >
+                        <History size={12} /> Ver histórico
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          marginTop: 8,
+                          width: "100%",
+                          justifyContent: "center",
+                          fontSize: 11,
+                          padding: "5px 8px",
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleCancelar(desl);
                         }}
                       >
@@ -484,7 +551,7 @@ export default function DesligamentoDigital() {
 
                 <div className="admissao-meta">
                   <span>
-                    <MapPin size={13} /> {colaborador?.filial}
+                    <MapPin size={13} /> {formatFilial(colaborador?.filial)}
                   </span>
                   <span>
                     <CalendarClock size={13} /> Desligamento: {formatDate(desl.dataDesligamento)}
@@ -558,7 +625,7 @@ export default function DesligamentoDigital() {
             {
               key: "filial",
               label: "Filial",
-              render: (d) => colaboradores.find((c) => c.id === d.colaboradorId)?.filial ?? "—",
+              render: (d) => formatFilial(colaboradores.find((c) => c.id === d.colaboradorId)?.filial) ?? "—",
             },
             { key: "motivo", label: "Motivo", render: (d) => d.motivo || "—" },
             { key: "data", label: "Data desligamento", render: (d) => formatDate(d.dataDesligamento) },
@@ -584,6 +651,14 @@ export default function DesligamentoDigital() {
                     onClick={() => abrirObservacao(d)}
                   >
                     Ver observação
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ padding: "5px 10px", fontSize: 12 }}
+                    onClick={() => abrirHistorico(d)}
+                  >
+                    Ver histórico
                   </button>
                   <button
                     type="button"
@@ -641,6 +716,14 @@ export default function DesligamentoDigital() {
           onSalvar={handleSalvarObservacao}
           salvando={salvandoObservacao}
           erro={erroObservacao}
+        />
+      )}
+
+      {desligamentoHistorico && (
+        <HistoricoEtapasModal
+          titulo={colaboradores.find((c) => c.id === desligamentoHistorico.colaboradorId)?.nome ?? "Colaborador não encontrado"}
+          historico={desligamentoHistorico.historico}
+          onFechar={() => setHistoricoId(null)}
         />
       )}
     </div>

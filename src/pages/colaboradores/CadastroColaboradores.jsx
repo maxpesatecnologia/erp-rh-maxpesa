@@ -20,6 +20,7 @@ import {
   importarColaboradores as importarColaboradoresRemoto,
 } from "../../lib/colaboradoresApi";
 import { criarDesligamento } from "../../lib/desligamentoApi";
+import { formatFilial } from "../../utils/format";
 
 function proximaMatricula(lista) {
   const maiorNumero = lista.reduce((max, c) => {
@@ -73,17 +74,43 @@ export default function CadastroColaboradores() {
   const [salvandoDesligamento, setSalvandoDesligamento] = useState(false);
   const [erroDesligamento, setErroDesligamento] = useState("");
   const [busca, setBusca] = useState("");
+  const [filtroFilial, setFiltroFilial] = useState("Todas");
+  const [filtroStatus, setFiltroStatus] = useState("Todos");
+  const [ordenarPor, setOrdenarPor] = useState("nome");
   const [confirmarLimparTodos, setConfirmarLimparTodos] = useState(false);
   const [limpandoTodos, setLimpandoTodos] = useState(false);
   const [erroLimparTodos, setErroLimparTodos] = useState("");
 
+  const filiaisDisponiveis = useMemo(
+    () => Array.from(new Set(colaboradores.map((c) => c.filial).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [colaboradores]
+  );
+  const statusDisponiveis = useMemo(
+    () => Array.from(new Set(colaboradores.map((c) => c.status).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [colaboradores]
+  );
+
+  const CAMPO_ORDENACAO = { nome: "nome", matricula: "id", cargo: "cargo", filial: "filial", status: "status" };
+
   const colaboradoresFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    if (!termo) return colaboradores;
-    return colaboradores.filter((c) =>
-      [c.nome, c.cargo, c.codigoDominio, c.id].some((campo) => String(campo || "").toLowerCase().includes(termo))
+    let lista = colaboradores;
+    if (termo) {
+      lista = lista.filter((c) =>
+        [c.nome, c.cargo, c.codigoDominio, c.id].some((campo) => String(campo || "").toLowerCase().includes(termo))
+      );
+    }
+    if (filtroFilial !== "Todas") {
+      lista = lista.filter((c) => c.filial === filtroFilial);
+    }
+    if (filtroStatus !== "Todos") {
+      lista = lista.filter((c) => c.status === filtroStatus);
+    }
+    const campo = CAMPO_ORDENACAO[ordenarPor] || "nome";
+    return [...lista].sort((a, b) =>
+      String(a[campo] || "").localeCompare(String(b[campo] || ""), "pt-BR", { numeric: true })
     );
-  }, [colaboradores, busca]);
+  }, [colaboradores, busca, filtroFilial, filtroStatus, ordenarPor]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -131,6 +158,7 @@ export default function CadastroColaboradores() {
     setDadosIniciaisForm(null);
     setFormVisitado(true);
     setFormAberto(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function handleSalvar(dados) {
@@ -253,22 +281,38 @@ export default function CadastroColaboradores() {
     }
   }
 
+  // Colaboradores importados já com "dataDemissao" preenchida (ver
+  // ImportarColaboradoresForm) entram com status "Desligado" e precisam do
+  // registro correspondente em Desligamento Digital — mesmo par (status +
+  // desligamento) que o botão "Desligar" manual cria (ver handleConfirmarDesligamento).
+  async function criarDesligamentosDaImportacao(novosColaboradores, linhas) {
+    await Promise.all(
+      novosColaboradores.map((colaborador, i) => {
+        const dataDemissao = linhas[i]?.dataDemissao;
+        if (!dataDemissao) return null;
+        return criarDesligamento({ colaboradorId: colaborador.id, dataDesligamento: dataDemissao }).catch(() => {});
+      })
+    );
+  }
+
   async function handleImportarEmMassa(linhas) {
     if (isSupabaseConfigured) {
       const novos = await importarColaboradoresRemoto(linhas);
+      await criarDesligamentosDaImportacao(novos, linhas);
       setColaboradores((atual) => [...novos, ...atual]);
       setImportAberto(false);
       return;
     }
+    const novos = [];
     setColaboradores((atual) => {
       let proximoNumero = Number(proximaMatricula(atual).replace(/\D/g, ""));
-      const novos = linhas.map((dados) => {
-        const colaborador = criarColaborador(dados, `C-${proximoNumero}`);
+      linhas.forEach((dados) => {
+        novos.push(criarColaborador(dados, `C-${proximoNumero}`));
         proximoNumero += 1;
-        return colaborador;
       });
       return [...novos, ...atual];
     });
+    await criarDesligamentosDaImportacao(novos, linhas);
     setImportAberto(false);
   }
 
@@ -338,18 +382,72 @@ export default function CadastroColaboradores() {
 
       <div className="card card-pad" style={{ position: "relative" }} ref={cardRef}>
         <div className="section-title">Colaboradores</div>
-        <div className="search-box">
-          <Search size={16} className="search-icon" />
-          <input
-            type="text"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por nome, cargo, código ou matrícula…"
-            aria-label="Buscar colaborador"
-          />
-          {busca && (
-            <button type="button" className="search-clear" onClick={() => setBusca("")} aria-label="Limpar busca">
-              <X size={14} />
+        <div className="filter-row">
+          <div className="search-box">
+            <Search size={16} className="search-icon" />
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome, cargo, código ou matrícula…"
+              aria-label="Buscar colaborador"
+            />
+            {busca && (
+              <button type="button" className="search-clear" onClick={() => setBusca("")} aria-label="Limpar busca">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <select
+            className="select-sm"
+            value={ordenarPor}
+            onChange={(e) => setOrdenarPor(e.target.value)}
+            aria-label="Ordenar por"
+          >
+            <option value="nome">Ordenar por: Nome</option>
+            <option value="matricula">Ordenar por: Matrícula</option>
+            <option value="cargo">Ordenar por: Cargo</option>
+            <option value="filial">Ordenar por: Filial</option>
+            <option value="status">Ordenar por: Status</option>
+          </select>
+          <select
+            className="select-sm"
+            value={filtroFilial}
+            onChange={(e) => setFiltroFilial(e.target.value)}
+            aria-label="Filtrar por filial"
+          >
+            <option value="Todas">Todas as filiais</option>
+            {filiaisDisponiveis.map((f) => (
+              <option key={f} value={f}>
+                {formatFilial(f)}
+              </option>
+            ))}
+          </select>
+          <select
+            className="select-sm"
+            value={filtroStatus}
+            onChange={(e) => setFiltroStatus(e.target.value)}
+            aria-label="Filtrar por status"
+          >
+            <option value="Todos">Todos os status</option>
+            {statusDisponiveis.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          {(busca || filtroFilial !== "Todas" || filtroStatus !== "Todos" || ordenarPor !== "nome") && (
+            <button
+              type="button"
+              className="btn btn-outline btn-limpar"
+              onClick={() => {
+                setBusca("");
+                setFiltroFilial("Todas");
+                setFiltroStatus("Todos");
+                setOrdenarPor("nome");
+              }}
+            >
+              Limpar filtros
             </button>
           )}
         </div>
@@ -372,7 +470,7 @@ export default function CadastroColaboradores() {
             },
             { key: "codigoDominio", label: "Código Domínio", render: (r) => r.codigoDominio || "—" },
             { key: "cargo", label: "Cargo" },
-            { key: "filial", label: "Filial" },
+            { key: "filial", label: "Filial", render: (r) => formatFilial(r.filial) },
             { key: "gestor", label: "Gestor" },
             { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
             {

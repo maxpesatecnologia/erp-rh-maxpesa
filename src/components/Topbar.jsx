@@ -5,6 +5,7 @@ import { ROLE_LABELS } from "../config/modules";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import TrocarSenhaModal from "./TrocarSenhaModal";
+import { formatFilial } from "../utils/format";
 
 export default function Topbar({ onMenuClick }) {
   const { user, signOut, isSupabaseConfigured } = useAuth();
@@ -36,10 +37,10 @@ export default function Topbar({ onMenuClick }) {
       </div>
       <div className="topbar-right">
         {user && (
-          <div className="user-chip" title={`${user.nome} · ${ROLE_LABELS[user.role] ?? user.role} · ${user.filial}`}>
+          <div className="user-chip" title={`${user.nome} · ${ROLE_LABELS[user.role] ?? user.role} · ${formatFilial(user.filial)}`}>
             <div className="user-meta">
               <div className="user-name">{user.nome}</div>
-              <div className="user-role">{ROLE_LABELS[user.role] ?? user.role} · {user.filial}</div>
+              <div className="user-role">{ROLE_LABELS[user.role] ?? user.role} · {formatFilial(user.filial)}</div>
             </div>
             <div className="user-avatar">{initials}</div>
           </div>

@@ -50,6 +50,7 @@ function paraAdmissao(row) {
     filial: row.filial || "",
     dataPrevista: row.data_prevista || "",
     checklist,
+    historico: row.historico || [],
   };
 }
 
@@ -77,6 +78,7 @@ export async function criarAdmissao(dados) {
     filial: dados.filial || null,
     data_prevista: dados.dataPrevista || null,
     checklist: CHECKLIST_PADRAO,
+    historico: [],
   };
 
   if (!isSupabaseConfigured) {
@@ -100,15 +102,20 @@ export async function excluirAdmissao(admissaoId) {
   if (error) throw new Error(error.message);
 }
 
-export async function atualizarChecklistAdmissao(admissaoId, checklist) {
+// `historico` é opcional — quando informado, é a lista completa (já com a
+// nova entrada) que substitui o histórico salvo. Quem monta cada entrada é
+// a tela (ver criarEntradaHistorico em AdmissaoDigital.jsx).
+export async function atualizarChecklistAdmissao(admissaoId, checklist, historico) {
+  const payload = historico !== undefined ? { checklist, historico } : { checklist };
+
   if (!isSupabaseConfigured) {
-    admissoesLocais = admissoesLocais.map((a) => (a.id === admissaoId ? { ...a, checklist } : a));
+    admissoesLocais = admissoesLocais.map((a) => (a.id === admissaoId ? { ...a, ...payload } : a));
     return paraAdmissao(admissoesLocais.find((a) => a.id === admissaoId));
   }
 
   const { data, error } = await supabase
     .from("rh_admissoes")
-    .update({ checklist })
+    .update(payload)
     .eq("id", admissaoId)
     .select()
     .single();

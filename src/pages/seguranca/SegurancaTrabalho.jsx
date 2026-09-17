@@ -1,6 +1,7 @@
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import { DOCUMENTOS_LEGAIS, DDS_REGISTROS, APRS, INSPECOES, NAO_CONFORMIDADES, CATS } from "../../data/mock/seguranca";
+import { formatFilial } from "../../utils/format";
 
 // Botão sem funcionalidade — só ilustra o layout enquanto os dados são mock.
 function BotaoEditar() {
@@ -26,7 +27,7 @@ export default function SegurancaTrabalho() {
         <DataTable
           columns={[
             { key: "documento", label: "Documento" },
-            { key: "filial", label: "Filial" },
+            { key: "filial", label: "Filial", render: (r) => formatFilial(r.filial) },
             { key: "validade", label: "Validade" },
             { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
             { key: "acoes", label: "", render: () => <BotaoEditar /> },

@@ -9,6 +9,7 @@ import { isSupabaseConfigured } from "../../lib/supabaseClient";
 import { listarColaboradores, atualizarDocumentosColaborador } from "../../lib/colaboradoresApi";
 import { DOCUMENTOS_PESSOAIS_ADMISSAO, documentoEhMultiplo } from "../../lib/admissaoApi";
 import { anexarDocumentoChecklist, removerDocumentoChecklist } from "../../lib/documentosChecklistApi";
+import { formatFilial } from "../../utils/format";
 
 // Mesma lista de documentos pessoais obrigatórios usada na Admissão Digital —
 // um colaborador que já chegou com eles anexados por lá não precisa reanexar
@@ -42,9 +43,23 @@ export default function Documentos() {
   const [carregando, setCarregando] = useState(isSupabaseConfigured);
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
+  const [ordenarPor, setOrdenarPor] = useState("nome");
+  const [filtroFilial, setFiltroFilial] = useState("Todas");
+  const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [colaboradorDocumentosId, setColaboradorDocumentosId] = useState(null);
 
   const colaboradorDocumentos = colaboradores.find((c) => c.id === colaboradorDocumentosId) ?? null;
+
+  const filiaisDisponiveis = useMemo(
+    () => Array.from(new Set(colaboradores.map((c) => c.filial).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [colaboradores]
+  );
+  const statusDisponiveis = useMemo(
+    () => Array.from(new Set(colaboradores.map((c) => c.status).filter(Boolean))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [colaboradores]
+  );
+
+  const CAMPO_ORDENACAO = { nome: "nome", matricula: "codigoDominio", cargo: "cargo", filial: "filial", status: "status" };
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -56,11 +71,23 @@ export default function Documentos() {
 
   const colaboradoresFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    if (!termo) return colaboradores;
-    return colaboradores.filter((c) =>
-      [c.nome, c.cargo, c.codigoDominio, c.id].some((campo) => String(campo || "").toLowerCase().includes(termo))
+    let lista = colaboradores;
+    if (termo) {
+      lista = lista.filter((c) =>
+        [c.nome, c.cargo, c.codigoDominio, c.id].some((campo) => String(campo || "").toLowerCase().includes(termo))
+      );
+    }
+    if (filtroFilial !== "Todas") {
+      lista = lista.filter((c) => c.filial === filtroFilial);
+    }
+    if (filtroStatus !== "Todos") {
+      lista = lista.filter((c) => c.status === filtroStatus);
+    }
+    const campo = CAMPO_ORDENACAO[ordenarPor] || "nome";
+    return [...lista].sort((a, b) =>
+      String(a[campo] || "").localeCompare(String(b[campo] || ""), "pt-BR", { numeric: true })
     );
-  }, [colaboradores, busca]);
+  }, [colaboradores, busca, filtroFilial, filtroStatus, ordenarPor]);
 
   function documentosDe(colaborador) {
     return { ...DOCUMENTOS_PADRAO, ...(colaborador.documentos || {}) };
@@ -146,18 +173,72 @@ export default function Documentos() {
           Cadastros anteriores a essa integração começam sem anexos — use "Ver documentos" para atribuir ou
           criar um documento extra específico do colaborador.
         </div>
-        <div className="search-box">
-          <Search size={16} className="search-icon" />
-          <input
-            type="text"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por nome, cargo, código ou matrícula…"
-            aria-label="Buscar colaborador"
-          />
-          {busca && (
-            <button type="button" className="search-clear" onClick={() => setBusca("")} aria-label="Limpar busca">
-              <X size={14} />
+        <div className="filter-row">
+          <div className="search-box">
+            <Search size={16} className="search-icon" />
+            <input
+              type="text"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome, cargo, código ou matrícula…"
+              aria-label="Buscar colaborador"
+            />
+            {busca && (
+              <button type="button" className="search-clear" onClick={() => setBusca("")} aria-label="Limpar busca">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <select
+            className="select-sm"
+            value={ordenarPor}
+            onChange={(e) => setOrdenarPor(e.target.value)}
+            aria-label="Ordenar por"
+          >
+            <option value="nome">Ordenar por: Nome</option>
+            <option value="matricula">Ordenar por: Cód. Dom.</option>
+            <option value="cargo">Ordenar por: Cargo</option>
+            <option value="filial">Ordenar por: Filial</option>
+            <option value="status">Ordenar por: Status</option>
+          </select>
+          <select
+            className="select-sm"
+            value={filtroFilial}
+            onChange={(e) => setFiltroFilial(e.target.value)}
+            aria-label="Filtrar por filial"
+          >
+            <option value="Todas">Todas as filiais</option>
+            {filiaisDisponiveis.map((f) => (
+              <option key={f} value={f}>
+                {formatFilial(f)}
+              </option>
+            ))}
+          </select>
+          <select
+            className="select-sm"
+            value={filtroStatus}
+            onChange={(e) => setFiltroStatus(e.target.value)}
+            aria-label="Filtrar por status"
+          >
+            <option value="Todos">Todos os status</option>
+            {statusDisponiveis.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          {(busca || filtroFilial !== "Todas" || filtroStatus !== "Todos" || ordenarPor !== "nome") && (
+            <button
+              type="button"
+              className="btn btn-outline btn-limpar"
+              onClick={() => {
+                setBusca("");
+                setFiltroFilial("Todas");
+                setFiltroStatus("Todos");
+                setOrdenarPor("nome");
+              }}
+            >
+              Limpar filtros
             </button>
           )}
         </div>
@@ -167,7 +248,7 @@ export default function Documentos() {
         ) : (
           <DataTable
             columns={[
-              { key: "id", label: "Matrícula" },
+              { key: "codigoDominio", label: "Cód. Dom.", render: (r) => r.codigoDominio || "—" },
               {
                 key: "nome",
                 label: "Nome",
@@ -179,7 +260,7 @@ export default function Documentos() {
                 ),
               },
               { key: "cargo", label: "Cargo" },
-              { key: "filial", label: "Filial" },
+              { key: "filial", label: "Filial", render: (r) => formatFilial(r.filial) },
               { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
               {
                 key: "documentos",

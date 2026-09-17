@@ -7,6 +7,7 @@ import Avatar from "../../components/Avatar";
 import { COLABORADORES } from "../../data/mock/colaboradores";
 import { listarColaboradores } from "../../lib/colaboradoresApi";
 import { isSupabaseConfigured } from "../../lib/supabaseClient";
+import { formatFilial } from "../../utils/format";
 
 // Remove acentos pra comparar termos de busca sem depender de como foram digitados.
 function normalizar(texto) {
@@ -137,7 +138,7 @@ export default function Competencias() {
                 ),
               },
               { key: "cargo", label: "Cargo" },
-              { key: "filial", label: "Filial" },
+              { key: "filial", label: "Filial", render: (r) => formatFilial(r.filial) },
               {
                 key: "competencias",
                 label: "Competências",

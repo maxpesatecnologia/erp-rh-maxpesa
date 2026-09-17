@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Paperclip, UploadCloud, Trash2, ExternalLink, Plus, FileX2 } from "lucide-react";
 import { obterUrlDocumentoChecklist } from "../lib/documentosChecklistApi";
 
@@ -24,6 +25,15 @@ export default function AnexarDocumentosModal({
   const [erro, setErro] = useState("");
   const [novoNome, setNovoNome] = useState("");
   const [criando, setCriando] = useState(false);
+
+  // Trava o scroll da página por trás enquanto o modal estiver aberto.
+  useEffect(() => {
+    const overflowAnterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = overflowAnterior;
+    };
+  }, []);
 
   const anexados = documentos.filter((doc) =>
     doc.multiplo ? (anexos[doc.chave]?.length ?? 0) > 0 : anexos[doc.chave]
@@ -93,7 +103,7 @@ export default function AnexarDocumentosModal({
     }
   }
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onFechar}>
       <div
         className={`modal-card ${documentos.length > 1 ? "modal-card-large" : ""}`}
@@ -288,6 +298,7 @@ export default function AnexarDocumentosModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

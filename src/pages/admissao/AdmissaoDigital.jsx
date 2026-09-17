@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, Circle, MapPin, CalendarClock, X, UserPlus } from "lucide-react";
+import { CheckCircle2, Circle, MapPin, CalendarClock, X, UserPlus, History } from "lucide-react";
 import Avatar from "../../components/Avatar";
 import AnexarDocumentosModal from "../../components/AnexarDocumentosModal";
-import { formatDate } from "../../utils/format";
+import HistoricoEtapasModal from "../../components/HistoricoEtapasModal";
+import { formatDate, formatFilial } from "../../utils/format";
 import {
   listarAdmissoes,
   atualizarChecklistAdmissao,
@@ -14,6 +15,7 @@ import {
 } from "../../lib/admissaoApi";
 import { anexarDocumentoChecklist, removerDocumentoChecklist } from "../../lib/documentosChecklistApi";
 import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
+import { useAuth } from "../../context/AuthContext";
 
 const CHECKLIST_LABELS = {
   dadosPessoais: "Dados pessoais",
@@ -30,6 +32,34 @@ const ETAPAS_COM_ANEXO = new Set(["documentos"]);
 // Essas etapas só liberam o check depois que "Upload de documentos" estiver concluído.
 const ETAPAS_APOS_DOCUMENTOS = new Set(["exameAdmissional", "assinaturaContrato", "integracaoDominio"]);
 
+const ETAPAS_ADMISSAO = Object.keys(CHECKLIST_LABELS);
+const ETAPA_CONCLUIDA = "concluido";
+const TITULOS_ETAPA = { ...CHECKLIST_LABELS, [ETAPA_CONCLUIDA]: "Concluída" };
+
+function getEtapaAtual(checklist) {
+  return ETAPAS_ADMISSAO.find((chave) => !checklist[chave]) ?? ETAPA_CONCLUIDA;
+}
+
+function criarEntradaHistorico(descricao, user) {
+  return {
+    descricao,
+    data: new Date().toISOString(),
+    usuarioId: user?.id ?? null,
+    usuarioNome: user?.nome ?? "Usuário desconhecido",
+  };
+}
+
+// Toda ação que altera o checklist (marcar etapa manualmente ou anexar/remover
+// documento) pode mudar a "etapa atual" derivada — quando isso acontece,
+// registramos automaticamente quem moveu e quando.
+function comHistoricoDeMovimento(admissao, checklistNovo, user) {
+  const etapaAntes = getEtapaAtual(admissao.checklist);
+  const etapaDepois = getEtapaAtual(checklistNovo);
+  if (etapaAntes === etapaDepois) return admissao.historico || [];
+  const descricao = `Movido de "${TITULOS_ETAPA[etapaAntes]}" para "${TITULOS_ETAPA[etapaDepois]}"`;
+  return [...(admissao.historico || []), criarEntradaHistorico(descricao, user)];
+}
+
 function getStatus(pct) {
   if (pct === 100) return { label: "Concluída", badgeClass: "badge-success" };
   if (pct >= 50) return { label: "Em andamento", badgeClass: "badge-info" };
@@ -38,6 +68,7 @@ function getStatus(pct) {
 
 export default function AdmissaoDigital() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [admissoes, setAdmissoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
@@ -45,9 +76,11 @@ export default function AdmissaoDigital() {
   const [excluindo, setExcluindo] = useState(false);
   const [erroExclusao, setErroExclusao] = useState("");
   const [admissaoDocumentosId, setAdmissaoDocumentosId] = useState(null);
+  const [historicoId, setHistoricoId] = useState(null);
 
   const admissaoParaExcluir = admissoes.find((a) => a.id === admissaoParaExcluirId) ?? null;
   const admissaoDocumentos = admissoes.find((a) => a.id === admissaoDocumentosId) ?? null;
+  const admissaoHistorico = admissoes.find((a) => a.id === historicoId) ?? null;
 
   useEffect(() => {
     listarAdmissoes()
@@ -88,28 +121,36 @@ export default function AdmissaoDigital() {
       return;
     }
     const checklistAnterior = admissao.checklist;
+    const historicoAnterior = admissao.historico || [];
     const checklist = { ...checklistAnterior, [chave]: !checklistAnterior[chave] };
-    setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist } : a)));
+    const historico = comHistoricoDeMovimento(admissao, checklist, user);
+    setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist, historico } : a)));
     try {
-      await atualizarChecklistAdmissao(admissao.id, checklist);
+      await atualizarChecklistAdmissao(admissao.id, checklist, historico);
     } catch (e) {
-      setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior } : a)));
+      setAdmissoes((atual) =>
+        atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior, historico: historicoAnterior } : a))
+      );
       setErro(e.message || "Erro ao atualizar etapa.");
     }
   }
 
   async function handleAnexarDocumento(admissao, docChave, arquivo) {
     const checklistAnterior = admissao.checklist;
+    const historicoAnterior = admissao.historico || [];
     const anexo = await anexarDocumentoChecklist(`admissao/${admissao.id}`, arquivo);
     const anexoAnterior = checklistAnterior.documentosAnexos[docChave];
     const novoValor = documentoEhMultiplo(docChave) ? [...(anexoAnterior || []), anexo] : anexo;
     const documentosAnexos = { ...checklistAnterior.documentosAnexos, [docChave]: novoValor };
     const checklist = { ...checklistAnterior, documentosAnexos, documentos: todosDocumentosAnexados(documentosAnexos) };
-    setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist } : a)));
+    const historico = comHistoricoDeMovimento(admissao, checklist, user);
+    setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist, historico } : a)));
     try {
-      await atualizarChecklistAdmissao(admissao.id, checklist);
+      await atualizarChecklistAdmissao(admissao.id, checklist, historico);
     } catch (e) {
-      setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior } : a)));
+      setAdmissoes((atual) =>
+        atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior, historico: historicoAnterior } : a))
+      );
       throw e;
     }
   }
@@ -118,18 +159,22 @@ export default function AdmissaoDigital() {
   // qual arquivo da lista remover; nos demais, remove o anexo único.
   async function handleRemoverDocumento(admissao, docChave, indice) {
     const checklistAnterior = admissao.checklist;
+    const historicoAnterior = admissao.historico || [];
     const anexoAtual = checklistAnterior.documentosAnexos[docChave];
     const multiplo = documentoEhMultiplo(docChave);
     const anexoRemovido = multiplo ? anexoAtual?.[indice] : anexoAtual;
     const novoValor = multiplo ? (anexoAtual || []).filter((_, i) => i !== indice) : null;
     const documentosAnexos = { ...checklistAnterior.documentosAnexos, [docChave]: novoValor };
     const checklist = { ...checklistAnterior, documentosAnexos, documentos: todosDocumentosAnexados(documentosAnexos) };
-    setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist } : a)));
+    const historico = comHistoricoDeMovimento(admissao, checklist, user);
+    setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist, historico } : a)));
     try {
       await removerDocumentoChecklist(anexoRemovido?.path);
-      await atualizarChecklistAdmissao(admissao.id, checklist);
+      await atualizarChecklistAdmissao(admissao.id, checklist, historico);
     } catch (e) {
-      setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior } : a)));
+      setAdmissoes((atual) =>
+        atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior, historico: historicoAnterior } : a))
+      );
       throw e;
     }
   }
@@ -186,6 +231,15 @@ export default function AdmissaoDigital() {
                   <span className={`badge ${status.badgeClass}`}>{status.label}</span>
                   <button
                     type="button"
+                    className="icon-btn"
+                    aria-label="Ver histórico"
+                    title="Ver histórico"
+                    onClick={() => setHistoricoId(adm.id)}
+                  >
+                    <History size={16} />
+                  </button>
+                  <button
+                    type="button"
                     className="icon-btn icon-btn-danger"
                     aria-label="Cancelar admissão"
                     title="Cancelar admissão"
@@ -200,7 +254,7 @@ export default function AdmissaoDigital() {
 
                 <div className="admissao-meta">
                   <span>
-                    <MapPin size={13} /> {adm.filial}
+                    <MapPin size={13} /> {formatFilial(adm.filial)}
                   </span>
                   <span>
                     <CalendarClock size={13} /> Previsão: {formatDate(adm.dataPrevista)}
@@ -291,6 +345,14 @@ export default function AdmissaoDigital() {
           textoConfirmando="Cancelando…"
           onConfirmar={confirmarExclusao}
           onCancelar={fecharModalExclusao}
+        />
+      )}
+
+      {admissaoHistorico && (
+        <HistoricoEtapasModal
+          titulo={admissaoHistorico.nome}
+          historico={admissaoHistorico.historico}
+          onFechar={() => setHistoricoId(null)}
         />
       )}
     </div>

@@ -33,6 +33,7 @@ function paraDesligamento(row) {
     checklist,
     emChecklist: row.em_checklist ?? false,
     observacao: row.observacao || "",
+    historico: row.historico || [],
   };
 }
 
@@ -60,6 +61,7 @@ export async function criarDesligamento(dados) {
     checklist: CHECKLIST_PADRAO,
     em_checklist: false,
     observacao: null,
+    historico: [],
   };
 
   if (!isSupabaseConfigured) {
@@ -83,15 +85,20 @@ export async function excluirDesligamento(desligamentoId) {
   if (error) throw new Error(error.message);
 }
 
-export async function atualizarChecklistDesligamento(desligamentoId, checklist) {
+// `historico` é opcional — quando informado, é a lista completa (já com a
+// nova entrada) que substitui o histórico salvo. Quem monta cada entrada é
+// a tela (ver criarEntradaHistorico em DesligamentoDigital.jsx).
+export async function atualizarChecklistDesligamento(desligamentoId, checklist, historico) {
+  const payload = historico !== undefined ? { checklist, historico } : { checklist };
+
   if (!isSupabaseConfigured) {
-    desligamentosLocais = desligamentosLocais.map((d) => (d.id === desligamentoId ? { ...d, checklist } : d));
+    desligamentosLocais = desligamentosLocais.map((d) => (d.id === desligamentoId ? { ...d, ...payload } : d));
     return paraDesligamento(desligamentosLocais.find((d) => d.id === desligamentoId));
   }
 
   const { data, error } = await supabase
     .from("rh_desligamentos")
-    .update({ checklist })
+    .update(payload)
     .eq("id", desligamentoId)
     .select()
     .single();
@@ -128,6 +135,7 @@ export async function importarDesligamentos(linhas) {
     checklist: { ...CHECKLIST_PADRAO, ...dados.checklist },
     em_checklist: false,
     observacao: null,
+    historico: [],
   }));
 
   if (!isSupabaseConfigured) {

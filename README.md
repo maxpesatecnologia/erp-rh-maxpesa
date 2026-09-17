@@ -105,8 +105,12 @@ create table rh_admissoes (
     "assinaturaContrato": false,
     "integracaoDominio": false
   }',
+  historico jsonb not null default '[]',
   created_at timestamptz not null default now()
 );
+
+-- Se a tabela já existia antes dessa coluna:
+-- alter table rh_admissoes add column if not exists historico jsonb not null default '[]';
 
 alter table rh_admissoes enable row level security;
 
@@ -150,6 +154,14 @@ create policy "admin e rh cancelam admissões"
 ```
 
 A tela permite cancelar uma admissão (botão "×" no card, com confirmação) — isso executa um `delete` na linha, então a policy de `delete` acima é obrigatória para o botão funcionar com o Supabase real.
+
+O ícone de relógio no card abre o **histórico de movimentação**: toda vez que a "etapa atual" (a primeira etapa
+do checklist ainda não concluída) muda — marcando/desmarcando uma etapa manualmente ou anexando/removendo um
+documento — é registrada uma entrada com a etapa de origem, a etapa de destino, a data/hora e quem fez a
+alteração (`useAuth()`, mesmo usuário logado). Fica guardado na coluna `historico` (array, mais recente
+primeiro na tela), sem tabela de log separada — mesmo padrão de histórico aninhado já usado em `prorrogacoes`
+na Gestão de Férias (ver `comHistoricoDeMovimento` em `src/pages/admissao/AdmissaoDigital.jsx` e o modal
+`src/components/HistoricoEtapasModal.jsx`, reaproveitado pelo Desligamento Digital).
 
 Sem `.env` configurado (modo demo), a tela funciona do mesmo jeito, mas guarda as admissões só em memória
 (`src/lib/admissaoApi.js`) — elas somem ao recarregar a página, só para dar para navegar o fluxo sem backend.
@@ -215,6 +227,12 @@ A tela abre em **Kanban** por padrão: cada coluna é uma etapa do checklist (En
 "Concluído" (`em_checklist` vira `true`) — mesmo padrão do botão "Efetivar contratação" do Kanban de Recrutamento.
 Clicando em qualquer card do Kanban abre um campo de observação livre (`observacao`), salvo por colaborador.
 
+O botão "Ver histórico" do card mostra as movimentações entre colunas do Kanban: cada arrasto (ou marcação de
+etapa pela aba Checklist, ou anexo/remoção de documento que muda a etapa derivada) grava uma entrada com a
+coluna de origem, a coluna de destino, a data/hora e quem moveu (`useAuth()`) na coluna `historico`. Mesma
+lógica e componente de modal da Admissão Digital — ver `comHistoricoDeMovimento` em
+`src/pages/desligamento/DesligamentoDigital.jsx`.
+
 ```sql
 create table rh_desligamentos (
   id uuid primary key default gen_random_uuid(),
@@ -229,12 +247,14 @@ create table rh_desligamentos (
   }',
   em_checklist boolean not null default false,
   observacao text,
+  historico jsonb not null default '[]',
   created_at timestamptz not null default now()
 );
 
 -- Se a tabela já existia antes dessas colunas:
 -- alter table rh_desligamentos add column if not exists em_checklist boolean not null default false;
 -- alter table rh_desligamentos add column if not exists observacao text;
+-- alter table rh_desligamentos add column if not exists historico jsonb not null default '[]';
 
 alter table rh_desligamentos enable row level security;
 
