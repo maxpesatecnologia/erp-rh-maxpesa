@@ -75,6 +75,27 @@ export async function criarDesligamento(dados) {
   return paraDesligamento(data);
 }
 
+// Corrige/preenche a data de um desligamento já existente — usado pelo campo
+// "Data de demissão" no Cadastro de Colaboradores (ver NovoColaboradorForm),
+// separado de criarDesligamento porque esse já tem registro em rh_desligamentos.
+export async function atualizarDataDesligamento(desligamentoId, dataDesligamento) {
+  if (!isSupabaseConfigured) {
+    desligamentosLocais = desligamentosLocais.map((d) =>
+      d.id === desligamentoId ? { ...d, data_desligamento: dataDesligamento } : d
+    );
+    return paraDesligamento(desligamentosLocais.find((d) => d.id === desligamentoId));
+  }
+
+  const { data, error } = await supabase
+    .from("rh_desligamentos")
+    .update({ data_desligamento: dataDesligamento })
+    .eq("id", desligamentoId)
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+  return paraDesligamento(data);
+}
+
 export async function excluirDesligamento(desligamentoId) {
   if (!isSupabaseConfigured) {
     desligamentosLocais = desligamentosLocais.filter((d) => d.id !== desligamentoId);

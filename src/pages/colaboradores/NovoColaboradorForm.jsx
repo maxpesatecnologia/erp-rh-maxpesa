@@ -73,6 +73,7 @@ const ESTADO_INICIAL = {
   admissao: "",
   salario: "",
   status: "Ativo",
+  dataDesligamento: "",
   dependentesNomes: [],
   cnhNumero: "",
   cnhCategoria: "",
@@ -84,8 +85,9 @@ const ESTADO_INICIAL = {
 
 // Converte um colaborador já carregado (formato usado pelas telas, com cnh
 // como objeto e nrs/certificacoes como array) de volta pro formato plano do
-// formulário — usado para pré-preencher a edição.
-function paraFormulario(colaborador) {
+// formulário — usado para pré-preencher a edição. `desligamento` é o registro
+// de rh_desligamentos correspondente (se existir) — fonte da data exibida.
+function paraFormulario(colaborador, desligamento) {
   if (!colaborador) return ESTADO_INICIAL;
   return {
     nome: colaborador.nome || "",
@@ -102,6 +104,7 @@ function paraFormulario(colaborador) {
     admissao: colaborador.admissao || "",
     salario: colaborador.salario ?? "",
     status: colaborador.status || "Ativo",
+    dataDesligamento: desligamento?.dataDesligamento || "",
     // Colaboradores antigos só têm a contagem (`dependentes`), sem nome — vira
     // essa quantidade de campos em branco pra poder nomear retroativamente.
     dependentesNomes: colaborador.dependentesNomes?.length
@@ -119,10 +122,10 @@ function paraFormulario(colaborador) {
 // `colaborador` presente = modo edição (pré-preenche e chama onSalvar com os
 // dados atualizados); ausente = cadastro novo. `dadosIniciais` pré-preenche um
 // cadastro novo (ex.: vindo da Admissão Digital) sem entrar em modo edição.
-export default function NovoColaboradorForm({ colaborador, dadosIniciais, onSalvar, onCancelar }) {
+export default function NovoColaboradorForm({ colaborador, desligamento, dadosIniciais, onSalvar, onCancelar }) {
   const editando = Boolean(colaborador);
   const [dados, setDados] = useState(() =>
-    editando ? paraFormulario(colaborador) : { ...ESTADO_INICIAL, ...dadosIniciais }
+    editando ? paraFormulario(colaborador, desligamento) : { ...ESTADO_INICIAL, ...dadosIniciais }
   );
   const [erro, setErro] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -171,6 +174,10 @@ export default function NovoColaboradorForm({ colaborador, dadosIniciais, onSalv
     }
     if (dados.celular.trim() && ![10, 11].includes(apenasDigitos(dados.celular).length)) {
       setErro("Celular inválido. Informe DDD + número (10 ou 11 dígitos).");
+      return;
+    }
+    if (dados.status === "Desligado" && !dados.dataDesligamento) {
+      setErro("Informe a data de demissão.");
       return;
     }
     setErro("");
@@ -314,7 +321,7 @@ export default function NovoColaboradorForm({ colaborador, dadosIniciais, onSalv
           <div className="field-group">
             <label htmlFor="status">Situação</label>
             {dados.status === "Desligado" ? (
-              <input id="status" value="Desligado" disabled title="Desligamento é feito pela ação “Desligar” na lista de colaboradores." />
+              <input id="status" value="Desligado" disabled title="Novos desligamentos são feitos pela ação “Desligar” na lista de colaboradores." />
             ) : (
               <select id="status" value={dados.status} onChange={(e) => atualizar("status", e.target.value)}>
                 <option value="Ativo">Ativo</option>
@@ -322,6 +329,18 @@ export default function NovoColaboradorForm({ colaborador, dadosIniciais, onSalv
               </select>
             )}
           </div>
+          {dados.status === "Desligado" && (
+            <div className="field-group">
+              <label htmlFor="dataDesligamento">Data de demissão *</label>
+              <input
+                id="dataDesligamento"
+                type="date"
+                value={dados.dataDesligamento}
+                onChange={(e) => atualizar("dataDesligamento", e.target.value)}
+                required
+              />
+            </div>
+          )}
           <div className="field-group">
             <label htmlFor="cnhNumero">CNH — número</label>
             <input id="cnhNumero" value={dados.cnhNumero} onChange={(e) => atualizar("cnhNumero", e.target.value)} placeholder="ex: 01234567890" />

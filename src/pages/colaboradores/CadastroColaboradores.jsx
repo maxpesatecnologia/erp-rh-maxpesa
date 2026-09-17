@@ -19,7 +19,7 @@ import {
   excluirTodosColaboradores as excluirTodosColaboradoresRemoto,
   importarColaboradores as importarColaboradoresRemoto,
 } from "../../lib/colaboradoresApi";
-import { criarDesligamento } from "../../lib/desligamentoApi";
+import { listarDesligamentos, criarDesligamento, atualizarDataDesligamento } from "../../lib/desligamentoApi";
 import { formatFilial } from "../../utils/format";
 
 function proximaMatricula(lista) {
@@ -55,6 +55,7 @@ export default function CadastroColaboradores() {
   const navigate = useNavigate();
   const location = useLocation();
   const [colaboradores, setColaboradores] = useState(isSupabaseConfigured ? [] : COLABORADORES);
+  const [desligamentos, setDesligamentos] = useState([]);
   const [carregando, setCarregando] = useState(isSupabaseConfigured);
   const [erroCarregamento, setErroCarregamento] = useState("");
   const [selected, setSelected] = useState(null);
@@ -120,6 +121,17 @@ export default function CadastroColaboradores() {
       .finally(() => setCarregando(false));
   }, []);
 
+  // Carregado à parte (não bloqueia a tabela de colaboradores) só pra saber,
+  // ao editar alguém já "Desligado", se já existe data registrada em
+  // Desligamento Digital e pré-preencher o campo "Data de demissão" com ela.
+  useEffect(() => {
+    listarDesligamentos().then(setDesligamentos).catch(() => {});
+  }, []);
+
+  function desligamentoDoColaborador(colaboradorId) {
+    return desligamentos.find((d) => d.colaboradorId === colaboradorId) || null;
+  }
+
   // Chegando da Admissão Digital com "Cadastro oficial" — abre o formulário
   // de novo colaborador já com os dados que a admissão tinha.
   useEffect(() => {
@@ -161,6 +173,22 @@ export default function CadastroColaboradores() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // Backfill/correção da data de demissão de quem já está "Desligado" (ver
+  // campo "Data de demissão" no NovoColaboradorForm) — cria o registro em
+  // Desligamento Digital se nunca existiu, ou corrige a data se já existia.
+  async function sincronizarDataDesligamento(colaboradorId, dados) {
+    if (dados.status !== "Desligado" || !dados.dataDesligamento) return;
+    const existente = desligamentoDoColaborador(colaboradorId);
+    if (existente) {
+      if (existente.dataDesligamento === dados.dataDesligamento) return;
+      const atualizado = await atualizarDataDesligamento(existente.id, dados.dataDesligamento);
+      setDesligamentos((atual) => atual.map((d) => (d.id === atualizado.id ? atualizado : d)));
+    } else {
+      const criado = await criarDesligamento({ colaboradorId, dataDesligamento: dados.dataDesligamento });
+      setDesligamentos((atual) => [...atual, criado]);
+    }
+  }
+
   async function handleSalvar(dados) {
     if (colaboradorEditando) {
       if (isSupabaseConfigured) {
@@ -171,6 +199,7 @@ export default function CadastroColaboradores() {
           atual.map((c) => (c.id === colaboradorEditando.id ? criarColaborador(dados, colaboradorEditando.id) : c))
         );
       }
+      await sincronizarDataDesligamento(colaboradorEditando.id, dados);
       fecharForm();
       return;
     }
@@ -286,13 +315,23 @@ export default function CadastroColaboradores() {
   // registro correspondente em Desligamento Digital — mesmo par (status +
   // desligamento) que o botão "Desligar" manual cria (ver handleConfirmarDesligamento).
   async function criarDesligamentosDaImportacao(novosColaboradores, linhas) {
-    await Promise.all(
+    const resultados = await Promise.allSettled(
       novosColaboradores.map((colaborador, i) => {
         const dataDemissao = linhas[i]?.dataDemissao;
-        if (!dataDemissao) return null;
-        return criarDesligamento({ colaboradorId: colaborador.id, dataDesligamento: dataDemissao }).catch(() => {});
+        if (!dataDemissao) return Promise.resolve(null);
+        return criarDesligamento({ colaboradorId: colaborador.id, dataDesligamento: dataDemissao });
       })
     );
+    const criados = resultados.filter((r) => r.status === "fulfilled" && r.value).map((r) => r.value);
+    if (criados.length > 0) setDesligamentos((atual) => [...atual, ...criados]);
+    const falhas = resultados
+      .map((r, i) => (r.status === "rejected" ? novosColaboradores[i].id : null))
+      .filter(Boolean);
+    if (falhas.length > 0) {
+      throw new Error(
+        `Colaboradores importados, mas o registro de desligamento falhou para: ${falhas.join(", ")}. Corrija a data de demissão manualmente na edição de cada um.`
+      );
+    }
   }
 
   async function handleImportarEmMassa(linhas) {
@@ -371,6 +410,7 @@ export default function CadastroColaboradores() {
               <NovoColaboradorForm
                 key={colaboradorEditando?.id ?? (dadosIniciaisForm ? "novo-prefill" : "novo")}
                 colaborador={colaboradorEditando}
+                desligamento={colaboradorEditando ? desligamentoDoColaborador(colaboradorEditando.id) : null}
                 dadosIniciais={dadosIniciaisForm}
                 onCancelar={fecharForm}
                 onSalvar={handleSalvar}
