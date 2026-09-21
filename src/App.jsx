@@ -22,6 +22,7 @@ import GestaoEPIs from "./pages/epis/GestaoEPIs";
 import GestaoEquipes from "./pages/equipes/GestaoEquipes";
 import ComunicacaoInterna from "./pages/comunicacao/ComunicacaoInterna";
 import IACorporativa from "./pages/ia/IACorporativa";
+import LogsAuditoria from "./pages/auditoria/LogsAuditoria";
 import NotFound from "./pages/NotFound";
 
 function withLayout(element) {
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/equipes" element={withLayout(<GestaoEquipes />)} />
           <Route path="/comunicacao" element={withLayout(<ComunicacaoInterna />)} />
           <Route path="/ia" element={withLayout(<IACorporativa />)} />
+          <Route path="/auditoria" element={withLayout(<LogsAuditoria />)} />
           <Route
             path="*"
             element={

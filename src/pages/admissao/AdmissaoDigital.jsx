@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, MapPin, CalendarClock, X, UserPlus, History } fro
 import Avatar from "../../components/Avatar";
 import AnexarDocumentosModal from "../../components/AnexarDocumentosModal";
 import HistoricoEtapasModal from "../../components/HistoricoEtapasModal";
+import UltimaEdicaoBadge from "../../components/UltimaEdicaoBadge";
 import { formatDate, formatFilial } from "../../utils/format";
 import {
   listarAdmissoes,
@@ -100,7 +101,7 @@ export default function AdmissaoDigital() {
     setExcluindo(true);
     setErroExclusao("");
     try {
-      await excluirAdmissao(admissaoParaExcluir.id);
+      await excluirAdmissao(admissaoParaExcluir.id, user);
       setAdmissoes((atual) => atual.filter((a) => a.id !== admissaoParaExcluir.id));
       setAdmissaoParaExcluirId(null);
     } catch (e) {
@@ -126,7 +127,7 @@ export default function AdmissaoDigital() {
     const historico = comHistoricoDeMovimento(admissao, checklist, user);
     setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist, historico } : a)));
     try {
-      await atualizarChecklistAdmissao(admissao.id, checklist, historico);
+      await atualizarChecklistAdmissao(admissao.id, checklist, historico, user);
     } catch (e) {
       setAdmissoes((atual) =>
         atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior, historico: historicoAnterior } : a))
@@ -146,7 +147,7 @@ export default function AdmissaoDigital() {
     const historico = comHistoricoDeMovimento(admissao, checklist, user);
     setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist, historico } : a)));
     try {
-      await atualizarChecklistAdmissao(admissao.id, checklist, historico);
+      await atualizarChecklistAdmissao(admissao.id, checklist, historico, user);
     } catch (e) {
       setAdmissoes((atual) =>
         atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior, historico: historicoAnterior } : a))
@@ -170,7 +171,7 @@ export default function AdmissaoDigital() {
     setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist, historico } : a)));
     try {
       await removerDocumentoChecklist(anexoRemovido?.path);
-      await atualizarChecklistAdmissao(admissao.id, checklist, historico);
+      await atualizarChecklistAdmissao(admissao.id, checklist, historico, user);
     } catch (e) {
       setAdmissoes((atual) =>
         atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior, historico: historicoAnterior } : a))
@@ -229,6 +230,13 @@ export default function AdmissaoDigital() {
                     <div className="admissao-cargo">{adm.cargo}</div>
                   </div>
                   <span className={`badge ${status.badgeClass}`}>{status.label}</span>
+                  <UltimaEdicaoBadge
+                    nome={adm.atualizadoPor}
+                    data={adm.atualizadoEm}
+                    tabela="rh_admissoes"
+                    registroId={adm.id}
+                    titulo={adm.nome}
+                  />
                   <button
                     type="button"
                     className="icon-btn"

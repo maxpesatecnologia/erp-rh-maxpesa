@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { UploadCloud, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
-import { CAMPOS_OBRIGATORIOS } from "./NovoColaboradorForm";
+import { CAMPOS_OBRIGATORIOS, cpfValido } from "./NovoColaboradorForm";
 import { isSupabaseConfigured } from "../../lib/supabaseClient";
+
+function apenasDigitos(valor) {
+  return String(valor ?? "").replace(/\D/g, "");
+}
 
 // "dependente1".."dependente6" são só um ponto de partida no modelo baixável —
 // a importação aceita quantas colunas "dependenteN" o arquivo trouxer (dependente7,
@@ -15,6 +19,7 @@ const COLUNAS_MODELO = [
   "cpf",
   "celular",
   "email",
+  "dataNascimento",
   "cargo",
   "departamento",
   "filial",
@@ -282,18 +287,69 @@ function dataValida(ano, mes, dia) {
   return data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia;
 }
 
-// filial, cargo e admissao podem chegar em branco na importação (preenchidos
-// depois, diretamente no cadastro) — os demais campos obrigatórios bloqueiam
-// a linha. admissao, quando informada, ainda precisa ser uma data válida.
-const CAMPOS_OPCIONAIS_NA_IMPORTACAO = ["filial", "cargo", "admissao"];
+// Campos de texto simples que, no modo "atualizar", só entram no payload
+// quando a célula tem valor — célula em branco nunca apaga o que já está
+// cadastrado, só é ignorada.
+const CAMPOS_TEXTO_SIMPLES_PARCIAL = [
+  "nome",
+  "codigoDominio",
+  "cpf",
+  "celular",
+  "email",
+  "cargo",
+  "departamento",
+  "filial",
+  "centroCusto",
+  "gestor",
+  "cnhNumero",
+  "cnhCategoria",
+  "nrs",
+  "certificacoes",
+  "equipamentos",
+];
 
-function validarLinha(registro) {
-  const erros = [];
-  for (const campo of CAMPOS_OBRIGATORIOS) {
-    if (campo === "admissao") continue;
-    if (CAMPOS_OPCIONAIS_NA_IMPORTACAO.includes(campo)) continue;
-    if (!String(registro[campo] ?? "").trim()) erros.push(`"${campo}" obrigatório`);
+// Monta o payload do modo "atualizar-parcial": só os campos com valor de fato
+// presente na linha (texto não vazio, data válida, dependentes informados).
+// Tudo que a planilha deixou em branco fica de fora — e por ficar de fora,
+// atualizarColaboradorParcial não toca na coluna correspondente no banco.
+function construirDadosParciais(registro, normalizados) {
+  const dados = {};
+  for (const campo of CAMPOS_TEXTO_SIMPLES_PARCIAL) {
+    const valor = String(registro[campo] ?? "").trim();
+    if (valor) dados[campo] = valor;
   }
+  if (normalizados.admissao) dados.admissao = normalizados.admissao;
+  if (normalizados.salario) dados.salario = normalizados.salario;
+  if (normalizados.cnhValidade) dados.cnhValidade = normalizados.cnhValidade;
+  if (normalizados.dataNascimento) dados.dataNascimento = normalizados.dataNascimento;
+  if (registro.dependentesNomes?.length > 0) {
+    dados.dependentesNomes = registro.dependentesNomes;
+    dados.dependentes = registro.dependentes;
+  }
+  // Preencher "dataDemissao" é o que marca a linha como colaborador desligado
+  // (mesmo comportamento do cadastro completo, ver abaixo).
+  if (normalizados.dataDemissao) {
+    dados.dataDemissao = normalizados.dataDemissao;
+    dados.status = "Desligado";
+  }
+  return dados;
+}
+
+// CPF é sempre a chave de match. Se já existe um colaborador com esse CPF, a
+// linha sempre atualiza (nunca duplica) — e só sobrescreve os campos que vierem
+// preenchidos, completa ou não. Sem match, só uma linha completa (todos os
+// campos obrigatórios) pode criar um colaborador novo; incompleta e sem match
+// vira erro em vez de criar um cadastro pela metade.
+function validarLinha(registro, mapaPorCpf) {
+  const erros = [];
+
+  const cpfBruto = String(registro.cpf ?? "").trim();
+  if (!cpfBruto) erros.push('"cpf" obrigatório (é a chave usada para localizar ou cadastrar o colaborador)');
+  else if (!cpfValido(cpfBruto)) erros.push('"cpf" inválido. Confira os números digitados.');
+  const existente = cpfBruto ? mapaPorCpf.get(apenasDigitos(cpfBruto)) : null;
+
+  if (!String(registro.nome ?? "").trim()) erros.push('"nome" obrigatório');
+
   const admissaoBruta = String(registro.admissao ?? "").trim();
   let admissaoNormalizada = null;
   if (admissaoBruta) {
@@ -303,7 +359,7 @@ function validarLinha(registro) {
   // Preencher "dataDemissao" é o que marca a linha como colaborador desligado:
   // ao importar, o status vira "Desligado" e um registro em Desligamento
   // Digital é criado automaticamente com essa data (mesmo fluxo do botão
-  // "Desligar" manual). Em branco, o colaborador entra como "Ativo" normalmente.
+  // "Desligar" manual). Em branco, o colaborador entra/permanece "Ativo".
   const dataDemissaoBruta = String(registro.dataDemissao ?? "").trim();
   let dataDemissaoNormalizada = null;
   if (dataDemissaoBruta) {
@@ -324,14 +380,80 @@ function validarLinha(registro) {
     cnhValidadeNormalizada = normalizarData(cnhValidadeBruta);
     if (!cnhValidadeNormalizada) erros.push('"cnhValidade" inválida (use AAAA-MM-DD ou DD/MM/AAAA)');
   }
-  return { erros, admissaoNormalizada, dataDemissaoNormalizada, salarioNormalizado, cnhValidadeNormalizada };
+  const dataNascimentoBruta = String(registro.dataNascimento ?? "").trim();
+  let dataNascimentoNormalizada = null;
+  if (dataNascimentoBruta) {
+    dataNascimentoNormalizada = normalizarData(dataNascimentoBruta);
+    if (!dataNascimentoNormalizada) erros.push('"dataNascimento" inválida (use AAAA-MM-DD ou DD/MM/AAAA)');
+  }
+
+  // Overwrite é sempre parcial (só os campos com valor, ver construirDadosParciais)
+  // — mesmo quando a linha está completa e o CPF já existe. "Completa" só decide
+  // se a linha PODE criar um colaborador novo quando o CPF não é encontrado.
+  const completa = CAMPOS_OBRIGATORIOS.every((campo) => String(registro[campo] ?? "").trim());
+  let modo = null;
+  if (cpfBruto && cpfValido(cpfBruto)) {
+    if (existente) {
+      modo = "atualizar";
+    } else if (completa) {
+      modo = "criar";
+    } else {
+      const faltando = CAMPOS_OBRIGATORIOS.filter((campo) => !String(registro[campo] ?? "").trim());
+      erros.push(
+        `Nenhum colaborador com esse CPF está cadastrado, e faltam campos obrigatórios para cadastrar um novo (${faltando.join(", ")})`
+      );
+    }
+  }
+
+  const normalizados = {
+    admissao: admissaoNormalizada,
+    dataDemissao: dataDemissaoNormalizada,
+    salario: salarioNormalizado,
+    cnhValidade: cnhValidadeNormalizada,
+    dataNascimento: dataNascimentoNormalizada,
+  };
+
+  const dadosCompletos = {
+    ...registro,
+    admissao: admissaoNormalizada ?? registro.admissao,
+    dataDemissao: dataDemissaoNormalizada,
+    status: dataDemissaoNormalizada ? "Desligado" : "Ativo",
+    salario: salarioNormalizado ?? registro.salario,
+    cnhValidade: cnhValidadeNormalizada ?? registro.cnhValidade,
+    dataNascimento: dataNascimentoNormalizada ?? registro.dataNascimento,
+  };
+
+  return {
+    dados: dadosCompletos,
+    dadosParciais: construirDadosParciais(registro, normalizados),
+    modo,
+    matriculaAlvo: existente?.id ?? null,
+    erros,
+  };
 }
 
-export default function ImportarColaboradoresForm({ onImportar, onCancelar, onLimparTodos, totalColaboradores = 0 }) {
+export default function ImportarColaboradoresForm({
+  onImportar,
+  onCancelar,
+  onLimparTodos,
+  totalColaboradores = 0,
+  colaboradoresExistentes = [],
+}) {
   const [arquivo, setArquivo] = useState(null);
   const [linhasProcessadas, setLinhasProcessadas] = useState(null);
   const [erroArquivo, setErroArquivo] = useState("");
   const [importando, setImportando] = useState(false);
+
+  // CPF (só dígitos) -> colaborador já cadastrado, usado para decidir se uma
+  // linha da planilha cria um colaborador novo ou atualiza um existente.
+  const mapaPorCpf = useMemo(() => {
+    const mapa = new Map();
+    colaboradoresExistentes.forEach((c) => {
+      const digitos = apenasDigitos(c.cpf);
+      if (digitos) mapa.set(digitos, c);
+    });
+    return mapa;
+  }, [colaboradoresExistentes]);
 
   // .xlsx em vez de .csv: CSV depende de separador/encoding que o Excel
   // interpreta de formas diferentes dependendo do idioma/config do usuário
@@ -346,26 +468,17 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar, onLi
   }
 
   function processarRegistros(cabecalho, linhas) {
-    const colunasFaltando = CAMPOS_OBRIGATORIOS.filter((c) => !cabecalho.includes(c));
+    // "nome" e "cpf" são as únicas colunas sempre obrigatórias no arquivo —
+    // as demais (cargo, departamento, salário etc.) só são obrigatórias por
+    // linha quando essa linha está criando um colaborador novo (ver validarLinha).
+    const colunasFaltando = ["nome", "cpf"].filter((c) => !cabecalho.includes(c));
     if (colunasFaltando.length > 0) {
       setErroArquivo(`Arquivo sem as colunas obrigatórias: ${colunasFaltando.join(", ")}.`);
       return;
     }
     const processadas = linhas.map((linha) => {
       const registro = extrairDependentes(linha);
-      const { erros, admissaoNormalizada, dataDemissaoNormalizada, salarioNormalizado, cnhValidadeNormalizada } =
-        validarLinha(registro);
-      return {
-        dados: {
-          ...registro,
-          admissao: admissaoNormalizada ?? registro.admissao,
-          dataDemissao: dataDemissaoNormalizada,
-          status: dataDemissaoNormalizada ? "Desligado" : "Ativo",
-          salario: salarioNormalizado ?? registro.salario,
-          cnhValidade: cnhValidadeNormalizada ?? registro.cnhValidade,
-        },
-        erros,
-      };
+      return validarLinha(registro, mapaPorCpf);
     });
     setLinhasProcessadas(processadas);
   }
@@ -414,13 +527,24 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar, onLi
     setImportando(true);
     setErroArquivo("");
     try {
-      await onImportar(validas.map((l) => l.dados));
+      await onImportar(
+        validas.map((l) => ({
+          modo: l.modo,
+          matriculaAlvo: l.matriculaAlvo,
+          dados: l.modo === "atualizar" ? l.dadosParciais : l.dados,
+        }))
+      );
     } catch (err) {
       setErroArquivo(err.message || "Erro ao importar colaboradores.");
     } finally {
       setImportando(false);
     }
   }
+
+  const LABEL_MODO = {
+    criar: "Novo cadastro",
+    atualizar: "Atualizar (só o preenchido)",
+  };
 
   return (
     <div className="card card-pad" style={{ marginBottom: 18 }}>
@@ -451,9 +575,11 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar, onLi
           </button>
         )}
         <span className="section-hint">
-          Colunas obrigatórias: {CAMPOS_OBRIGATORIOS.filter((c) => !CAMPOS_OPCIONAIS_NA_IMPORTACAO.includes(c)).join(", ")}.
-          {" "}(as demais — {CAMPOS_OPCIONAIS_NA_IMPORTACAO.join(", ")} — podem ficar em branco e ser preenchidas depois.)
-          {" "}Preencher "dataDemissao" marca o colaborador como Desligado automaticamente.
+          "nome" e "cpf" são sempre obrigatórios — o CPF localiza o colaborador. Se já existe um
+          colaborador com esse CPF, a linha só atualiza os campos que vierem preenchidos (célula
+          em branco nunca apaga o que já está cadastrado). Se o CPF não existe, a linha só cria um
+          colaborador novo quando estiver completa ({CAMPOS_OBRIGATORIOS.join(", ")}) — senão vira erro.
+          {" "}Preencher "dataDemissao" marca o colaborador como Desligado.
         </span>
       </div>
 
@@ -479,14 +605,23 @@ export default function ImportarColaboradoresForm({ onImportar, onCancelar, onLi
           <DataTable
             columns={[
               { key: "nome", label: "Nome", render: (r) => r.dados.nome || "—" },
+              { key: "cpf", label: "CPF", render: (r) => r.dados.cpf || "—" },
+              {
+                key: "modo",
+                label: "Modo",
+                render: (r) => (r.erros.length === 0 ? LABEL_MODO[r.modo] || "—" : "—"),
+              },
               { key: "cargo", label: "Cargo", render: (r) => r.dados.cargo || "—" },
               { key: "filial", label: "Filial", render: (r) => r.dados.filial || "—" },
               { key: "admissao", label: "Admissão", render: (r) => r.dados.admissao || "—" },
+              { key: "dataNascimento", label: "Nascimento", render: (r) => r.dados.dataNascimento || "—" },
               {
                 key: "situacao",
                 label: "Situação",
-                render: (r) =>
-                  r.dados.status === "Desligado" ? `Desligado em ${r.dados.dataDemissao}` : "Ativo",
+                render: (r) => {
+                  if (r.dados.status === "Desligado") return `Desligado em ${r.dados.dataDemissao}`;
+                  return r.modo === "atualizar" ? "Não alterada" : "Ativo";
+                },
               },
               {
                 key: "status",

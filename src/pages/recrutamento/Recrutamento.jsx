@@ -16,6 +16,9 @@ import { PIPELINE_STAGES } from "../../data/mock/recrutamento";
 import { PASTAS_CARGOS } from "../../data/mock/bancoCurriculos";
 import { formatDate } from "../../utils/format";
 import { isSupabaseConfigured } from "../../lib/supabaseClient";
+import { useAuth } from "../../context/AuthContext";
+import { registrarAuditoria } from "../../lib/auditoriaApi";
+import UltimaEdicaoBadge from "../../components/UltimaEdicaoBadge";
 import {
   listarCandidatos,
   criarCandidato as criarCandidatoRemoto,
@@ -53,6 +56,7 @@ function proximoId(prefixo, lista) {
 
 export default function Recrutamento() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [visualizacao, setVisualizacao] = useState("kanban");
 
   // --- Kanban de vagas ---
@@ -138,7 +142,7 @@ export default function Recrutamento() {
         cargo: dados.cargo || candidatoEfetivando.vaga,
         filial: dados.filial,
         dataPrevista: dados.dataPrevista,
-      });
+      }, user);
       setEfetivandoIds((atual) => new Set(atual).add(candidatoEfetivando.id));
       setCandidatoEfetivandoId(null);
       navigate("/admissao");
@@ -158,20 +162,28 @@ export default function Recrutamento() {
     setErroSalvar("");
     try {
       if (isSupabaseConfigured) {
-        const candidato = await criarCandidatoRemoto({ nome, vaga: novaVaga.trim(), origem });
+        const candidato = await criarCandidatoRemoto({ nome, vaga: novaVaga.trim(), origem }, user);
         setCandidatos((atual) => [...atual, candidato]);
       } else {
-        setCandidatos((atual) => [
-          ...atual,
-          {
-            id: `local-${proximoIdLocal++}`,
-            nome,
-            vaga: novaVaga.trim(),
-            origem: origem || "Cadastro manual",
-            estagioId: ESTAGIO_INICIAL,
-            faseAtual: "",
-          },
-        ]);
+        const novoCandidato = {
+          id: `local-${proximoIdLocal++}`,
+          nome,
+          vaga: novaVaga.trim(),
+          origem: origem || "Cadastro manual",
+          estagioId: ESTAGIO_INICIAL,
+          faseAtual: "",
+          atualizadoPor: user?.nome ?? null,
+          atualizadoEm: new Date().toISOString(),
+        };
+        setCandidatos((atual) => [...atual, novoCandidato]);
+        await registrarAuditoria({
+          tabela: "rh_candidatos",
+          registroId: novoCandidato.id,
+          registroLabel: novoCandidato.nome,
+          acao: "criacao",
+          usuario: user,
+          depois: { nome, vaga: novaVaga.trim(), origem },
+        });
       }
       setNovoNome("");
       setNovaVaga("");
@@ -193,12 +205,27 @@ export default function Recrutamento() {
     if (!candidato || candidato.estagioId === targetStageId) return;
 
     const estagioAnterior = candidato.estagioId;
-    setCandidatos((atual) => atual.map((c) => (c.id === candidato.id ? { ...c, estagioId: targetStageId } : c)));
+    setCandidatos((atual) =>
+      atual.map((c) =>
+        c.id === candidato.id
+          ? { ...c, estagioId: targetStageId, atualizadoPor: user?.nome ?? null, atualizadoEm: new Date().toISOString() }
+          : c
+      )
+    );
 
     if (isSupabaseConfigured) {
-      moverCandidatoRemoto(candidato.id, targetStageId).catch((erro) => {
+      moverCandidatoRemoto(candidato.id, targetStageId, user).catch((erro) => {
         setCandidatos((atual) => atual.map((c) => (c.id === candidato.id ? { ...c, estagioId: estagioAnterior } : c)));
         setErroCarregamento(erro.message);
+      });
+    } else {
+      registrarAuditoria({
+        tabela: "rh_candidatos",
+        registroId: candidato.id,
+        registroLabel: candidato.nome,
+        acao: "edicao",
+        usuario: user,
+        depois: { estagioId: targetStageId },
       });
     }
   }
@@ -215,12 +242,25 @@ export default function Recrutamento() {
     setErroModal("");
     try {
       if (isSupabaseConfigured) {
-        const atualizado = await atualizarCandidatoRemoto(candidatoAberto.id, dados);
+        const atualizado = await atualizarCandidatoRemoto(candidatoAberto.id, dados, user, candidatoAberto);
         setCandidatos((atual) => atual.map((c) => (c.id === atualizado.id ? atualizado : c)));
       } else {
         setCandidatos((atual) =>
-          atual.map((c) => (c.id === candidatoAberto.id ? { ...c, ...dados } : c))
+          atual.map((c) =>
+            c.id === candidatoAberto.id
+              ? { ...c, ...dados, atualizadoPor: user?.nome ?? null, atualizadoEm: new Date().toISOString() }
+              : c
+          )
         );
+        await registrarAuditoria({
+          tabela: "rh_candidatos",
+          registroId: candidatoAberto.id,
+          registroLabel: dados.nome || candidatoAberto.nome,
+          acao: "edicao",
+          usuario: user,
+          antes: candidatoAberto,
+          depois: dados,
+        });
       }
       setCandidatoAbertoId(null);
     } catch (erro) {
@@ -249,7 +289,15 @@ export default function Recrutamento() {
     setErroExclusaoCandidato("");
     try {
       if (isSupabaseConfigured) {
-        await excluirCandidatoRemoto(candidato.id);
+        await excluirCandidatoRemoto(candidato.id, user, candidato.nome);
+      } else {
+        await registrarAuditoria({
+          tabela: "rh_candidatos",
+          registroId: candidato.id,
+          registroLabel: candidato.nome,
+          acao: "exclusao",
+          usuario: user,
+        });
       }
       setCandidatos((atual) => atual.filter((c) => c.id !== candidato.id));
       setCandidatoParaExcluirId(null);
@@ -274,13 +322,27 @@ export default function Recrutamento() {
     setErroPasta("");
     try {
       if (isSupabaseConfigured) {
-        const nova = await criarPastaRemota(cargo);
+        const nova = await criarPastaRemota(cargo, user);
         setPastas((atual) => [nova, ...atual]);
         setPastaSelecionadaId(nova.id);
       } else {
-        const nova = { id: proximoId("cargo", pastas), cargo, curriculos: [] };
+        const nova = {
+          id: proximoId("cargo", pastas),
+          cargo,
+          curriculos: [],
+          atualizadoPor: user?.nome ?? null,
+          atualizadoEm: new Date().toISOString(),
+        };
         setPastas((atual) => [...atual, nova]);
         setPastaSelecionadaId(nova.id);
+        await registrarAuditoria({
+          tabela: "rh_pastas_cargos",
+          registroId: nova.id,
+          registroLabel: nova.cargo,
+          acao: "criacao",
+          usuario: user,
+          depois: { cargo },
+        });
       }
       setNovoCargo("");
       setNovaPastaAberta(false);
@@ -309,7 +371,15 @@ export default function Recrutamento() {
     setErroExclusao("");
     try {
       if (isSupabaseConfigured) {
-        await excluirPastaRemota(pasta.id);
+        await excluirPastaRemota(pasta.id, user, pasta.cargo);
+      } else {
+        await registrarAuditoria({
+          tabela: "rh_pastas_cargos",
+          registroId: pasta.id,
+          registroLabel: pasta.cargo,
+          acao: "exclusao",
+          usuario: user,
+        });
       }
       setPastas((atual) => atual.filter((p) => p.id !== pasta.id));
       setPastaSelecionadaId((atual) => (atual === pasta.id ? null : atual));
@@ -328,11 +398,12 @@ export default function Recrutamento() {
     setImportando(true);
     try {
       if (isSupabaseConfigured) {
-        const novos = await importarCurriculosRemoto(pastaSelecionadaId, arquivos);
+        const novos = await importarCurriculosRemoto(pastaSelecionadaId, arquivos, user);
         setPastas((atual) =>
           atual.map((p) => (p.id === pastaSelecionadaId ? { ...p, curriculos: [...novos, ...p.curriculos] } : p))
         );
       } else {
+        let novosLocais = [];
         setPastas((atual) =>
           atual.map((p) => {
             if (p.id !== pastaSelecionadaId) return p;
@@ -344,13 +415,24 @@ export default function Recrutamento() {
                 arquivoNome: arquivo.name,
                 enviadoEm: new Date().toISOString().slice(0, 10),
                 origem: "Upload manual",
+                atualizadoPor: user?.nome ?? null,
+                atualizadoEm: new Date().toISOString(),
               };
               proximoNumero += 1;
               return cv;
             });
+            novosLocais = novos;
             return { ...p, curriculos: [...novos, ...p.curriculos] };
           })
         );
+        await registrarAuditoria({
+          tabela: "rh_curriculos",
+          registroId: pastaSelecionadaId,
+          registroLabel: `Importação de ${novosLocais.length} currículo(s)`,
+          acao: "criacao",
+          usuario: user,
+          depois: { quantidade: novosLocais.length },
+        });
       }
     } catch (erro) {
       setErroImportacao(erro.message || "Erro ao importar currículos.");
@@ -364,7 +446,15 @@ export default function Recrutamento() {
     setErroAcaoCv("");
     try {
       if (isSupabaseConfigured) {
-        await removerCurriculoRemoto(cv);
+        await removerCurriculoRemoto(cv, user);
+      } else {
+        await registrarAuditoria({
+          tabela: "rh_curriculos",
+          registroId: cv.id,
+          registroLabel: cv.nome,
+          acao: "exclusao",
+          usuario: user,
+        });
       }
       setPastas((atual) =>
         atual.map((p) =>
@@ -545,6 +635,15 @@ export default function Recrutamento() {
                         <div className={"kanban-card-fase" + (c.faseAtual ? " kanban-card-fase-preenchida" : "")}>
                           {c.faseAtual || "Clique para ver e editar…"}
                         </div>
+                        <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+                          <UltimaEdicaoBadge
+                            nome={c.atualizadoPor}
+                            data={c.atualizadoEm}
+                            tabela="rh_candidatos"
+                            registroId={c.id}
+                            titulo={c.nome}
+                          />
+                        </div>
                         {stage.id === ESTAGIO_APROVACAO && (
                           <button
                             type="button"
@@ -638,6 +737,15 @@ export default function Recrutamento() {
                     <div style={{ fontSize: 12.5, color: "var(--color-text-muted)" }}>
                       {pasta.curriculos.length} currículo{pasta.curriculos.length === 1 ? "" : "s"}
                     </div>
+                    <div style={{ marginTop: 8 }}>
+                      <UltimaEdicaoBadge
+                        nome={pasta.atualizadoPor}
+                        data={pasta.atualizadoEm}
+                        tabela="rh_pastas_cargos"
+                        registroId={pasta.id}
+                        titulo={pasta.cargo}
+                      />
+                    </div>
                   </div>
                 );
               })}
@@ -706,6 +814,15 @@ export default function Recrutamento() {
                               <div className="doc-row-title">{cv.nome}</div>
                               <div className="doc-row-meta">
                                 {cv.arquivoNome} · {cv.origem} · recebido em {formatDate(cv.enviadoEm)}
+                              </div>
+                              <div style={{ marginTop: 4 }}>
+                                <UltimaEdicaoBadge
+                                  nome={cv.atualizadoPor}
+                                  data={cv.atualizadoEm}
+                                  tabela="rh_curriculos"
+                                  registroId={cv.id}
+                                  titulo={cv.nome}
+                                />
                               </div>
                             </div>
                             {isSupabaseConfigured && (

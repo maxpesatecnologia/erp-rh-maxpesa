@@ -5,36 +5,50 @@ import { responder, SUGESTOES } from "../../lib/iaCorporativa";
 export default function IACorporativa() {
   const { user } = useAuth();
   const [mensagens, setMensagens] = useState([
-    { autor: "bot", texto: "Olá! Sou a IA Corporativa da Maxpesa. Pergunte sobre NRs, ASO, treinamentos, procedimentos ou operadores disponíveis." },
+    {
+      autor: "bot",
+      texto:
+        "Olá! Eu sou o Max, a IA da Maxpesa. Posso ajudar com assuntos de RH/DP: admissão, documentos, férias, desligamento, cadastro, benefícios ou avaliação de desempenho.",
+    },
   ]);
   const [input, setInput] = useState("");
+  const [enviando, setEnviando] = useState(false);
   const scrollRef = useRef(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [mensagens]);
+  }, [mensagens, enviando]);
 
-  function enviar(texto) {
+  async function enviar(texto) {
     const pergunta = texto ?? input;
-    if (!pergunta.trim()) return;
-    const resposta = responder(pergunta, user);
-    setMensagens((prev) => [...prev, { autor: "user", texto: pergunta }, { autor: "bot", texto: resposta }]);
+    if (!pergunta.trim() || enviando) return;
+
+    const historico = mensagens.slice(1); // sem a saudação inicial
+    setMensagens((prev) => [...prev, { autor: "user", texto: pergunta }]);
     setInput("");
+    setEnviando(true);
+
+    try {
+      const resposta = await responder(pergunta, user, historico);
+      setMensagens((prev) => [...prev, { autor: "bot", texto: resposta }]);
+    } finally {
+      setEnviando(false);
+    }
   }
 
   return (
     <div>
       <div className="page-header">
         <div>
-          <h1>IA Corporativa</h1>
-          <div className="page-subtitle">Respostas automáticas sobre NRs, ASO, treinamentos, procedimentos e equipes</div>
+          <h1>Max — IA da Maxpesa</h1>
+          <div className="page-subtitle">Respostas e ajuda prática sobre RH e Departamento Pessoal (RH/DP)</div>
         </div>
       </div>
 
       <div className="card card-pad">
         <div className="ia-suggestions">
           {SUGESTOES.map((s) => (
-            <button className="ia-suggestion-chip" key={s} onClick={() => enviar(s)}>
+            <button className="ia-suggestion-chip" key={s} onClick={() => enviar(s)} disabled={enviando}>
               {s}
             </button>
           ))}
@@ -47,15 +61,17 @@ export default function IACorporativa() {
                 {m.texto}
               </div>
             ))}
+            {enviando && <div className="ia-msg bot ia-msg-loading">Digitando…</div>}
           </div>
           <div className="ia-input-row">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && enviar()}
-              placeholder="Digite sua pergunta…"
+              placeholder="Digite sua pergunta sobre RH/DP…"
+              disabled={enviando}
             />
-            <button className="btn btn-primary" onClick={() => enviar()}>
+            <button className="btn btn-primary" onClick={() => enviar()} disabled={enviando}>
               Enviar
             </button>
           </div>

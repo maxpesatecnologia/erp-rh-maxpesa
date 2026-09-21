@@ -4,6 +4,9 @@ import { Plus, Search, Upload, X } from "lucide-react";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import Avatar from "../../components/Avatar";
+import UltimaEdicaoBadge from "../../components/UltimaEdicaoBadge";
+import { useAuth } from "../../context/AuthContext";
+import { registrarAuditoria } from "../../lib/auditoriaApi";
 import NovoColaboradorForm from "./NovoColaboradorForm";
 import ImportarColaboradoresForm from "./ImportarColaboradoresForm";
 import IniciarDesligamentoModal from "./IniciarDesligamentoModal";
@@ -14,6 +17,7 @@ import {
   listarColaboradores,
   criarColaborador as criarColaboradorRemoto,
   atualizarColaborador as atualizarColaboradorRemoto,
+  atualizarColaboradorParcial as atualizarColaboradorParcialRemoto,
   atualizarStatusColaborador,
   excluirColaborador as excluirColaboradorRemoto,
   excluirTodosColaboradores as excluirTodosColaboradoresRemoto,
@@ -33,7 +37,7 @@ function proximaMatricula(lista) {
 // Transforma os dados brutos de um formulário (manual ou importado) no objeto
 // final de colaborador — reaproveitado tanto pelo cadastro único quanto pela
 // importação em massa.
-function criarColaborador(novo, id) {
+function criarColaborador(novo, id, usuario) {
   return {
     ...novo,
     id,
@@ -48,12 +52,47 @@ function criarColaborador(novo, id) {
     // Digital (documentos já anexados por lá); senão, começa vazio na aba Documentos.
     documentos: novo.documentos ?? { anexos: {}, extras: [] },
     dependentesNomes: novo.dependentesNomes ?? [],
+    atualizadoPor: usuario?.nome ?? null,
+    atualizadoEm: new Date().toISOString(),
   };
+}
+
+// Equivalente, em memória (modo demonstração sem Supabase), de
+// atualizarColaboradorParcial: aplica só os campos presentes em `dados` sobre
+// um colaborador já carregado — o resto do cadastro fica como estava.
+function mesclarColaborador(atual, dados, usuario) {
+  const mesclado = { ...atual, atualizadoPor: usuario?.nome ?? null, atualizadoEm: new Date().toISOString() };
+  const CAMPOS_DIRETOS = [
+    "nome", "codigoDominio", "cpf", "celular", "email", "dataNascimento", "cargo",
+    "departamento", "filial", "centroCusto", "gestor", "admissao", "status",
+  ];
+  CAMPOS_DIRETOS.forEach((campo) => {
+    if (dados[campo] !== undefined) mesclado[campo] = dados[campo];
+  });
+  if (dados.salario !== undefined) mesclado.salario = Number(dados.salario) || 0;
+  if (dados.dependentesNomes !== undefined) {
+    mesclado.dependentesNomes = dados.dependentesNomes;
+    mesclado.dependentes = dados.dependentes ?? dados.dependentesNomes.length;
+  }
+  if (dados.cnhNumero !== undefined || dados.cnhCategoria !== undefined || dados.cnhValidade !== undefined) {
+    mesclado.cnh = {
+      numero: dados.cnhNumero ?? mesclado.cnh?.numero ?? "",
+      categoria: dados.cnhCategoria ?? mesclado.cnh?.categoria ?? "",
+      validade: dados.cnhValidade ?? mesclado.cnh?.validade ?? "",
+    };
+  }
+  if (dados.nrs !== undefined) mesclado.nrs = String(dados.nrs).split(",").map((s) => s.trim()).filter(Boolean);
+  if (dados.certificacoes !== undefined)
+    mesclado.certificacoes = String(dados.certificacoes).split(",").map((s) => s.trim()).filter(Boolean);
+  if (dados.equipamentos !== undefined)
+    mesclado.equipamentos = String(dados.equipamentos).split(",").map((s) => s.trim()).filter(Boolean);
+  return mesclado;
 }
 
 export default function CadastroColaboradores() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [colaboradores, setColaboradores] = useState(isSupabaseConfigured ? [] : COLABORADORES);
   const [desligamentos, setDesligamentos] = useState([]);
   const [carregando, setCarregando] = useState(isSupabaseConfigured);
@@ -192,25 +231,41 @@ export default function CadastroColaboradores() {
   async function handleSalvar(dados) {
     if (colaboradorEditando) {
       if (isSupabaseConfigured) {
-        const atualizado = await atualizarColaboradorRemoto(colaboradorEditando.id, dados);
+        const atualizado = await atualizarColaboradorRemoto(colaboradorEditando.id, dados, user, colaboradorEditando);
         setColaboradores((atual) => atual.map((c) => (c.id === atualizado.id ? atualizado : c)));
       } else {
-        setColaboradores((atual) =>
-          atual.map((c) => (c.id === colaboradorEditando.id ? criarColaborador(dados, colaboradorEditando.id) : c))
-        );
+        const atualizado = criarColaborador(dados, colaboradorEditando.id, user);
+        setColaboradores((atual) => atual.map((c) => (c.id === colaboradorEditando.id ? atualizado : c)));
+        await registrarAuditoria({
+          tabela: "rh_colaboradores",
+          registroId: colaboradorEditando.id,
+          registroLabel: atualizado.nome,
+          acao: "edicao",
+          usuario: user,
+          antes: colaboradorEditando,
+          depois: dados,
+        });
       }
       await sincronizarDataDesligamento(colaboradorEditando.id, dados);
       fecharForm();
       return;
     }
     if (isSupabaseConfigured) {
-      const colaborador = await criarColaboradorRemoto(dados);
+      const colaborador = await criarColaboradorRemoto(dados, user);
       setColaboradores((atual) => [colaborador, ...atual]);
       fecharForm();
       return;
     }
-    const colaborador = criarColaborador(dados, proximaMatricula(colaboradores));
+    const colaborador = criarColaborador(dados, proximaMatricula(colaboradores), user);
     setColaboradores((atual) => [colaborador, ...atual]);
+    await registrarAuditoria({
+      tabela: "rh_colaboradores",
+      registroId: colaborador.id,
+      registroLabel: colaborador.nome,
+      acao: "criacao",
+      usuario: user,
+      depois: dados,
+    });
     fecharForm();
   }
 
@@ -232,7 +287,15 @@ export default function CadastroColaboradores() {
     setErroExclusao("");
     try {
       if (isSupabaseConfigured) {
-        await excluirColaboradorRemoto(colaborador.id);
+        await excluirColaboradorRemoto(colaborador.id, user, colaborador.nome);
+      } else {
+        await registrarAuditoria({
+          tabela: "rh_colaboradores",
+          registroId: colaborador.id,
+          registroLabel: colaborador.nome,
+          acao: "exclusao",
+          usuario: user,
+        });
       }
       setColaboradores((atual) => atual.filter((c) => c.id !== colaborador.id));
       if (selected?.id === colaborador.id) {
@@ -272,7 +335,7 @@ export default function CadastroColaboradores() {
         dataDesligamento: dados.dataDesligamento,
       });
       if (isSupabaseConfigured) {
-        await atualizarStatusColaborador(colaboradorDesligando.id, "Desligado");
+        await atualizarStatusColaborador(colaboradorDesligando.id, "Desligado", user);
       }
       setColaboradores((atual) =>
         atual.map((c) => (c.id === colaboradorDesligando.id ? { ...c, status: "Desligado" } : c))
@@ -297,7 +360,15 @@ export default function CadastroColaboradores() {
     setErroLimparTodos("");
     try {
       if (isSupabaseConfigured) {
-        await excluirTodosColaboradoresRemoto();
+        await excluirTodosColaboradoresRemoto(user);
+      } else {
+        await registrarAuditoria({
+          tabela: "rh_colaboradores",
+          registroId: "todos",
+          registroLabel: "Todos os colaboradores",
+          acao: "exclusao",
+          usuario: user,
+        });
       }
       setColaboradores([]);
       setSelected(null);
@@ -310,49 +381,110 @@ export default function CadastroColaboradores() {
     }
   }
 
-  // Colaboradores importados já com "dataDemissao" preenchida (ver
-  // ImportarColaboradoresForm) entram com status "Desligado" e precisam do
-  // registro correspondente em Desligamento Digital — mesmo par (status +
-  // desligamento) que o botão "Desligar" manual cria (ver handleConfirmarDesligamento).
-  async function criarDesligamentosDaImportacao(novosColaboradores, linhas) {
+  // Colaboradores importados/atualizados com "dataDemissao" preenchida (ver
+  // ImportarColaboradoresForm) precisam do registro correspondente em
+  // Desligamento Digital — reaproveita sincronizarDataDesligamento (mesma
+  // lógica do backfill manual: cria se nunca existiu, corrige se já existia).
+  async function sincronizarDesligamentosEmLote(pares) {
+    const comData = pares.filter((p) => p.colaboradorId && p.dataDemissao);
     const resultados = await Promise.allSettled(
-      novosColaboradores.map((colaborador, i) => {
-        const dataDemissao = linhas[i]?.dataDemissao;
-        if (!dataDemissao) return Promise.resolve(null);
-        return criarDesligamento({ colaboradorId: colaborador.id, dataDesligamento: dataDemissao });
-      })
+      comData.map((p) =>
+        sincronizarDataDesligamento(p.colaboradorId, { status: "Desligado", dataDesligamento: p.dataDemissao })
+      )
     );
-    const criados = resultados.filter((r) => r.status === "fulfilled" && r.value).map((r) => r.value);
-    if (criados.length > 0) setDesligamentos((atual) => [...atual, ...criados]);
     const falhas = resultados
-      .map((r, i) => (r.status === "rejected" ? novosColaboradores[i].id : null))
+      .map((r, i) => (r.status === "rejected" ? comData[i].colaboradorId : null))
       .filter(Boolean);
     if (falhas.length > 0) {
       throw new Error(
-        `Colaboradores importados, mas o registro de desligamento falhou para: ${falhas.join(", ")}. Corrija a data de demissão manualmente na edição de cada um.`
+        `Colaboradores salvos, mas o registro de desligamento falhou para: ${falhas.join(", ")}. Corrija a data de demissão manualmente na edição de cada um.`
       );
     }
   }
 
-  async function handleImportarEmMassa(linhas) {
+  // `itens`: [{ modo: "criar" | "atualizar", matriculaAlvo, dados }] — ver
+  // ImportarColaboradoresForm. "criar" sempre grava tudo (linha completa,
+  // sem cadastro anterior); "atualizar" (CPF já cadastrado) só grava os
+  // campos presentes em `dados`, sem tocar no resto do cadastro existente.
+  async function handleImportarEmMassa(itens) {
+    const criar = itens.filter((i) => i.modo === "criar");
+    const atualizar = itens.filter((i) => i.modo === "atualizar");
+
     if (isSupabaseConfigured) {
-      const novos = await importarColaboradoresRemoto(linhas);
-      await criarDesligamentosDaImportacao(novos, linhas);
-      setColaboradores((atual) => [...novos, ...atual]);
+      const novos = criar.length > 0 ? await importarColaboradoresRemoto(criar.map((i) => i.dados), user) : [];
+      if (novos.length > 0) setColaboradores((atual) => [...novos, ...atual]);
+
+      const resultados = await Promise.allSettled(
+        atualizar.map((item) => atualizarColaboradorParcialRemoto(item.matriculaAlvo, item.dados, user))
+      );
+      const atualizados = resultados.filter((r) => r.status === "fulfilled" && r.value).map((r) => r.value);
+      if (atualizados.length > 0) {
+        setColaboradores((atual) => atual.map((c) => atualizados.find((a) => a.id === c.id) || c));
+      }
+      const falhasAtualizacao = resultados
+        .map((r, i) => (r.status === "rejected" ? atualizar[i].matriculaAlvo : null))
+        .filter(Boolean);
+
+      const paresDesligamento = [
+        ...novos.map((c, i) => ({ colaboradorId: c.id, dataDemissao: criar[i]?.dados.dataDemissao })),
+        ...atualizar
+          .map((item, i) =>
+            resultados[i].status === "fulfilled"
+              ? { colaboradorId: item.matriculaAlvo, dataDemissao: item.dados.dataDemissao }
+              : null
+          )
+          .filter(Boolean),
+      ];
+
       setImportAberto(false);
+
+      let erroDesligamentos = "";
+      try {
+        await sincronizarDesligamentosEmLote(paresDesligamento);
+      } catch (erro) {
+        erroDesligamentos = erro.message;
+      }
+      if (falhasAtualizacao.length > 0 || erroDesligamentos) {
+        const partes = [];
+        if (falhasAtualizacao.length > 0) partes.push(`Falha ao atualizar CPF(s): ${falhasAtualizacao.join(", ")}.`);
+        if (erroDesligamentos) partes.push(erroDesligamentos);
+        throw new Error(partes.join(" "));
+      }
       return;
     }
+
+    // Modo demonstração (sem Supabase): tudo fica só no estado local.
     const novos = [];
     setColaboradores((atual) => {
       let proximoNumero = Number(proximaMatricula(atual).replace(/\D/g, ""));
-      linhas.forEach((dados) => {
-        novos.push(criarColaborador(dados, `C-${proximoNumero}`));
+      const lista = atual.map((c) => {
+        const item = atualizar.find((i) => i.matriculaAlvo === c.id);
+        return item ? mesclarColaborador(c, item.dados, user) : c;
+      });
+      criar.forEach((item) => {
+        novos.push(criarColaborador(item.dados, `C-${proximoNumero}`, user));
         proximoNumero += 1;
       });
-      return [...novos, ...atual];
+      return [...novos, ...lista];
     });
-    await criarDesligamentosDaImportacao(novos, linhas);
+    if (criar.length + atualizar.length > 0) {
+      await registrarAuditoria({
+        tabela: "rh_colaboradores",
+        registroId: "importacao",
+        registroLabel: `Importação de ${criar.length + atualizar.length} colaborador(es)`,
+        acao: "criacao",
+        usuario: user,
+        depois: { quantidade: criar.length + atualizar.length },
+      });
+    }
+
+    const paresDesligamento = [
+      ...novos.map((c, i) => ({ colaboradorId: c.id, dataDemissao: criar[i]?.dados.dataDemissao })),
+      ...atualizar.map((item) => ({ colaboradorId: item.matriculaAlvo, dataDemissao: item.dados.dataDemissao })),
+    ];
+
     setImportAberto(false);
+    await sincronizarDesligamentosEmLote(paresDesligamento);
   }
 
   return (
@@ -396,6 +528,7 @@ export default function CadastroColaboradores() {
                 onCancelar={() => setImportAberto(false)}
                 onImportar={handleImportarEmMassa}
                 totalColaboradores={colaboradores.length}
+                colaboradoresExistentes={colaboradores}
                 onLimparTodos={() => setConfirmarLimparTodos(true)}
               />
             </div>
@@ -513,6 +646,19 @@ export default function CadastroColaboradores() {
             { key: "filial", label: "Filial", render: (r) => formatFilial(r.filial) },
             { key: "gestor", label: "Gestor" },
             { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
+            {
+              key: "ultimaEdicao",
+              label: "Última edição",
+              render: (r) => (
+                <UltimaEdicaoBadge
+                  nome={r.atualizadoPor}
+                  data={r.atualizadoEm}
+                  tabela="rh_colaboradores"
+                  registroId={r.id}
+                  titulo={r.nome}
+                />
+              ),
+            },
             {
               key: "acao",
               label: "",

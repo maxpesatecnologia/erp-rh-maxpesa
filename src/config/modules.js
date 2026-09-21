@@ -19,6 +19,7 @@ import {
   Megaphone,
   Bot,
   Palmtree,
+  ClipboardList,
 } from "lucide-react";
 
 export const ROLE_LABELS = {
@@ -116,7 +117,7 @@ export const NAV_SECTIONS = [
       },
       {
         path: "/medicina",
-        label: "Medicina Ocupacional",
+        label: "Gestão de ASOs",
         icon: Stethoscope,
         roles: ["admin", "rh", "gestor"],
       },
@@ -148,6 +149,21 @@ export const NAV_SECTIONS = [
         label: "IA Corporativa",
         icon: Bot,
         roles: ["admin", "rh", "gestor", "colaborador"],
+      },
+    ],
+  },
+  {
+    title: "Administração",
+    items: [
+      {
+        path: "/auditoria",
+        label: "Logs de Auditoria",
+        icon: ClipboardList,
+        roles: ["admin"],
+        // Diferente dos demais módulos (que aparecem cinza/cadeado pra quem não
+        // tem permissão), este some do menu por completo pra quem não é admin —
+        // decisão deliberada por ser uma tela sensível (ver README).
+        hiddenIfNoAccess: true,
       },
     ],
   },

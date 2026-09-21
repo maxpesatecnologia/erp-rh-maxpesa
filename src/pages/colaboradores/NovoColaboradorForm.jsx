@@ -26,8 +26,10 @@ function formatarCPF(valor) {
 }
 
 // Validação oficial do dígito verificador do CPF (não só formato/tamanho) —
-// pega CPF digitado errado ou aleatório antes de ir pro banco.
-function cpfValido(valor) {
+// pega CPF digitado errado ou aleatório antes de ir pro banco. Exportada
+// porque a importação em planilha (ImportarColaboradoresForm) também usa o
+// CPF como chave de match e precisa validar antes de confiar nele.
+export function cpfValido(valor) {
   const d = apenasDigitos(valor);
   if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
   const calcularDigito = (base) => {
@@ -65,6 +67,7 @@ const ESTADO_INICIAL = {
   cpf: "",
   celular: "",
   email: "",
+  dataNascimento: "",
   cargo: "",
   departamento: "",
   filial: "",
@@ -96,6 +99,7 @@ function paraFormulario(colaborador, desligamento) {
     cpf: formatarCPF(colaborador.cpf || ""),
     celular: formatarCelular(colaborador.celular || ""),
     email: colaborador.email || "",
+    dataNascimento: colaborador.dataNascimento || "",
     cargo: colaborador.cargo || "",
     departamento: colaborador.departamento || "",
     filial: colaborador.filial || "",
@@ -277,6 +281,16 @@ export default function NovoColaboradorForm({ colaborador, desligamento, dadosIn
               value={dados.email}
               onChange={(e) => atualizar("email", e.target.value)}
               placeholder="ex: nome@empresa.com"
+            />
+          </div>
+          <div className="field-group">
+            <label htmlFor="dataNascimento">Data de nascimento</label>
+            <input
+              id="dataNascimento"
+              type="date"
+              value={dados.dataNascimento}
+              onChange={(e) => atualizar("dataNascimento", e.target.value)}
+              title="Usada para exibir o colaborador nos aniversariantes do mural de Comunicação Interna"
             />
           </div>
           <div className="field-group">

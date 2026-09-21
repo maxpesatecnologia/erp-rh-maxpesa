@@ -406,6 +406,62 @@ Os painéis de autoatendimento do colaborador no Portal (`SolicitarFeriasPanel.j
 e sua matrícula em `rh_colaboradores`, que hoje não existe em nenhum módulo do Portal — é um pré-requisito maior,
 compartilhado com os outros painéis de autoatendimento (dados cadastrais, banco de horas etc.), não só o de férias.
 
+### Comunicação Interna: mural, aniversariantes e férias da equipe
+
+A tela (`src/pages/comunicacao/ComunicacaoInterna.jsx`) tem três widgets, cada um ligado a uma fonte diferente:
+
+- **Mural de comunicados**: publicado e lido de `rh_comunicados` (`src/lib/comunicacaoApi.js`). Qualquer perfil com
+  acesso ao módulo (`admin`, `rh`, `gestor`, `colaborador`) pode ler; só `admin`/`rh` veem o botão **"Novo
+  comunicado"** (mesmo padrão `podeGerenciar` usado em Avaliação de Desempenho).
+- **Aniversariantes**: vem do campo **"Data de nascimento"** do Cadastro de Colaboradores (`data_nascimento` em
+  `rh_colaboradores`) — só aparece quem tiver esse campo preenchido. Sem cadastro manual próprio: para incluir
+  alguém, preencha a data de nascimento no cadastro do colaborador.
+- **Férias da equipe**: já usa as solicitações aprovadas de `rh_ferias_solicitacoes` (ver seção "Gestão de Férias"
+  acima) — nada adicional a configurar aqui além daquela tabela.
+
+Os três têm um alternador **Futuros / Todos / Anteriores** (aniversariantes e comunicados) ou **Em andamento /
+Agendadas / Concluídas / Todas** (férias) para localizar tanto o que já passou quanto o que ainda vai acontecer.
+
+```sql
+alter table rh_colaboradores add column if not exists data_nascimento date;
+
+create table rh_comunicados (
+  id uuid primary key default gen_random_uuid(),
+  titulo text not null,
+  autor text not null default 'RH',
+  data date not null default current_date,
+  data_evento date,
+  conteudo text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table rh_comunicados enable row level security;
+
+-- todo perfil com acesso ao módulo (ver roles de "/comunicacao" em src/config/modules.js) pode ler o mural
+create policy "usuários autenticados leem comunicados"
+  on rh_comunicados for select
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid()
+    )
+  );
+
+-- só admin/rh publicam (mesmos perfis que veem o botão "Novo comunicado" na tela)
+create policy "admin e rh publicam comunicados"
+  on rh_comunicados for insert
+  with check (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh')
+    )
+  );
+```
+
+Sem `.env` configurado (modo demo), a tela funciona do mesmo jeito, mas os comunicados publicados ficam só em
+memória (`src/lib/comunicacaoApi.js`) e os aniversariantes/férias caem nos mocks de
+`src/data/mock/comunicacao.js` — tudo some ao recarregar a página, só para dar para navegar o fluxo sem backend.
+
 ### Avaliação de Desempenho (proposta em validação com a gestão)
 
 Diferente de Admissão/Desligamento, aqui existe um cadastro manual: o RH/admin clica em **"Iniciar avaliação"**,
@@ -495,6 +551,148 @@ colaborador ainda não preenche a própria autoavaliação pelo Portal do Colabo
 para o colaborador preencher sozinho, isso vira uma tela nova no Portal do Colaborador, com uma policy de RLS
 adicional restringindo cada um à própria linha (`colaborador_id` batendo com o perfil logado).
 
+### Avaliação das Equipes (status do time reportado pelo gestor ao RH)
+
+Tela **Gestão de Equipes** (`src/pages/equipes/GestaoEquipes.jsx`, que só renderiza
+`src/pages/equipes/AvaliacaoEquipes.jsx`). Os times são fixos — `EQUIPES` em `src/lib/avaliacaoEquipeApi.js` — e não
+vêm de cadastro nenhum. São 7 times distintos: Comercial, Operacional, Segurança do Trabalho, Suprimentos, RH,
+Manutenção e Operação — note que "Operacional", "Manutenção" e "Operação" são três times diferentes, não um só.
+Não existe hoje um
+vínculo de "gestor responsável por este time" no cadastro — qualquer `admin`/`rh`/`gestor` pode registrar avaliação
+para qualquer time; o nome de quem registrou fica salvo em cada avaliação (`gestor_responsavel`, preenchido com o
+nome do usuário logado) e a leitura é livre para todo mundo que acessa `/equipes`.
+
+Cada avaliação tem 4 indicadores fixos de 1 a 5 (clima, produtividade, segurança do trabalho e quadro/dotação —
+ver `INDICADORES_EQUIPE`) — a "nota geral" exibida na tela **não é digitada**, é sempre a média dos 4
+(`notaGeralDaAvaliacao`), pra manter a régua igual em todo período e todo time. Além dos indicadores, o gestor
+escreve um resumo em texto livre para o RH e, opcionalmente, pontos de atenção/riscos.
+
+O registro é **append-only**: não existe edição nem exclusão de avaliação já salva — cada uma é a "foto" do time
+naquele período (`periodo`, formato `AAAA-MM`). É assim que o histórico por time fica confiável para comparar a
+evolução ao longo do tempo e comparar times entre si (tabela "Comparativo entre equipes" no topo da aba, e o
+histórico + indicador de tendência dentro do card de cada time).
+
+```sql
+create table rh_avaliacoes_equipe (
+  id uuid primary key default gen_random_uuid(),
+  equipe text not null,
+  periodo text not null, -- "AAAA-MM"
+  indicadores jsonb not null default '{}', -- { clima, produtividade, seguranca, quadro }, cada um de 1 a 5
+  pontos_atencao text not null default '',
+  observacoes text not null default '',
+  gestor_responsavel text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table rh_avaliacoes_equipe enable row level security;
+
+-- todo perfil com acesso ao módulo (admin, rh, gestor — ver roles de "/equipes" em src/config/modules.js) lê tudo
+create policy "admin, rh e gestor leem avaliações de equipe"
+  on rh_avaliacoes_equipe for select
+  using (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh', 'gestor')
+    )
+  );
+
+-- mesmos perfis registram avaliação (não há update/delete: histórico é append-only)
+create policy "admin, rh e gestor registram avaliação de equipe"
+  on rh_avaliacoes_equipe for insert
+  with check (
+    exists (
+      select 1 from rh_profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'rh', 'gestor')
+    )
+  );
+```
+
+Sem `.env` configurado (modo demo), a tela funciona do mesmo jeito, mas guarda as avaliações só em memória
+(`src/lib/avaliacaoEquipeApi.js`) — elas somem ao recarregar a página, só para dar para navegar o fluxo sem
+backend.
+
+### Auditoria: quem editou por último e logs completos para o admin
+
+Todo módulo do sistema (Cadastro de Colaboradores, Recrutamento, Banco de Currículos, Admissão, Desligamento,
+Férias, Avaliação de Desempenho, Avaliação de Equipes e Comunicação Interna) registra, a cada criação/edição/
+exclusão, **quem fez** e **quando** — de duas formas complementares:
+
+1. Cada linha ganha duas colunas próprias, `atualizado_por` (nome de quem fez a última alteração) e
+   `atualizado_em` (data/hora) — é o que alimenta o badge **"Editado por Fulano · dd/mm/aaaa hh:mm"** no
+   cantinho de cada registro (linha de tabela, card de Kanban etc.). Clicar no badge abre o histórico completo
+   daquele registro específico.
+2. Toda alteração também grava uma entrada na tabela central `rh_auditoria` — com quem, quando, em qual módulo/
+   registro, que tipo de ação (criação/edição/exclusão) e quais campos mudaram (antes → depois). É o que
+   alimenta tanto o clique no badge (filtrado por aquele registro) quanto a tela **Logs de Auditoria**
+   (`/auditoria`, `src/pages/auditoria/LogsAuditoria.jsx`), visível **só para o perfil `admin`** — inclusive
+   escondida do menu lateral por completo para os demais perfis (não aparece nem "bloqueada com cadeado", ao
+   contrário dos outros módulos — ver `hiddenIfNoAccess` em `src/config/modules.js` e o filtro correspondente em
+   `src/components/Sidebar.jsx`; o acesso direto pela URL também é barrado por `roles: ["admin"]` via o
+   `canAccess`/`ProtectedRoute` de sempre).
+
+A camada que registra e lista esse log é `src/lib/auditoriaApi.js` (`registrarAuditoria`/`listarAuditoria`), e
+cada `src/lib/*Api.js` chama `registrarAuditoria` depois de todo `insert`/`update`/`delete` ter sucesso — nunca
+antes, e uma falha ao gravar a auditoria nunca derruba a ação principal (fica só um aviso no console). Ver o
+padrão completo em `atualizarColaborador` de `src/lib/colaboradoresApi.js`.
+
+Para funcionar com o Supabase real, crie a tabela central e adicione as colunas em cada tabela existente:
+
+```sql
+create table rh_auditoria (
+  id uuid primary key default gen_random_uuid(),
+  tabela text not null,
+  registro_id text not null,
+  registro_label text,
+  acao text not null check (acao in ('criacao', 'edicao', 'exclusao')),
+  usuario_id uuid,
+  usuario_nome text not null,
+  usuario_email text,
+  usuario_role text,
+  alteracoes jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+
+alter table rh_auditoria enable row level security;
+
+create policy "admin le auditoria"
+  on rh_auditoria for select
+  using (
+    exists (select 1 from rh_profiles p where p.id = auth.uid() and p.role = 'admin')
+  );
+
+create policy "usuarios autenticados registram auditoria"
+  on rh_auditoria for insert
+  with check (
+    exists (select 1 from rh_profiles p where p.id = auth.uid())
+  );
+
+alter table rh_colaboradores add column if not exists atualizado_por text;
+alter table rh_colaboradores add column if not exists atualizado_em timestamptz;
+alter table rh_candidatos add column if not exists atualizado_por text;
+alter table rh_candidatos add column if not exists atualizado_em timestamptz;
+alter table rh_pastas_cargos add column if not exists atualizado_por text;
+alter table rh_pastas_cargos add column if not exists atualizado_em timestamptz;
+alter table rh_curriculos add column if not exists atualizado_por text;
+alter table rh_curriculos add column if not exists atualizado_em timestamptz;
+alter table rh_admissoes add column if not exists atualizado_por text;
+alter table rh_admissoes add column if not exists atualizado_em timestamptz;
+alter table rh_desligamentos add column if not exists atualizado_por text;
+alter table rh_desligamentos add column if not exists atualizado_em timestamptz;
+alter table rh_ferias_solicitacoes add column if not exists atualizado_por text;
+alter table rh_ferias_solicitacoes add column if not exists atualizado_em timestamptz;
+alter table rh_avaliacoes add column if not exists atualizado_por text;
+alter table rh_avaliacoes add column if not exists atualizado_em timestamptz;
+alter table rh_avaliacoes_equipe add column if not exists atualizado_por text;
+alter table rh_avaliacoes_equipe add column if not exists atualizado_em timestamptz;
+alter table rh_comunicados add column if not exists atualizado_por text;
+alter table rh_comunicados add column if not exists atualizado_em timestamptz;
+```
+
+Sem `.env` configurado (modo demo), tudo funciona do mesmo jeito, mas tanto o `atualizado_por`/`atualizado_em`
+de cada registro quanto o log de `rh_auditoria` ficam só em memória (mesmo padrão dos outros módulos em modo
+demo) — somem ao recarregar a página, só para dar para navegar o fluxo (inclusive a tela `/auditoria`, logando
+como `admin@maxpesa.com.br`) sem depender do Supabase.
+
 ### Convenção de prefixo `rh_` (banco compartilhado entre sistemas)
 
 O projeto Supabase pode acabar sendo compartilhado entre vários sistemas internos da Maxpesa, não só este ERP
@@ -515,6 +713,46 @@ Não existe formulário de cadastro no app — só a tela de login. O controle d
   pelo RH/administrador), o app encerra a sessão automaticamente e mostra "Este e-mail ainda não foi liberado
   para acessar o sistema." — mesmo que a senha esteja correta. Ou seja, `rh_profiles` é a lista de e-mails
   autorizados: ninguém entra por conta própria, só quem o RH/admin inserir lá.
+
+### IA Corporativa: assistente de RH/DP com a API do Google Gemini
+
+A tela **IA Corporativa** (`/ia`, `src/pages/ia/IACorporativa.jsx`) traz o assistente **Max, a IA da Maxpesa**,
+um chat cujo escopo é **exclusivamente assuntos de trabalho ligados a RH / Departamento Pessoal** — admissão,
+documentos, férias, desligamento, cadastro, benefícios, 13º, avaliação de desempenho e comunicação interna.
+Qualquer pergunta fora desse escopo (papo pessoal, entretenimento, outras áreas como NRs/ASO/operação de
+equipamentos etc.) recebe sempre a mesma recusa educada e padronizada: *"Não posso responder perguntas que não
+sejam relacionadas a trabalho!"*. O Max também nunca inventa dados que não tem (saldo de férias, datas,
+informações de outros colaboradores) — só responde com o que está disponível e confirmado, orientando a
+consultar a tela correta ou o RH para o resto.
+
+A pergunta nunca vai direto do navegador para o Google. O fluxo é:
+
+```
+front-end (src/lib/iaCorporativa.js)
+  → Supabase Edge Function "ia-corporativa" (supabase/functions/ia-corporativa/index.ts)
+    → API do Google Gemini, com a API key como secret do projeto
+```
+
+Isso segue o mesmo princípio já usado para o SharePoint/Microsoft Graph mais abaixo: **a API key nunca fica
+no front-end**. A Edge Function guarda o `GEMINI_API_KEY` como secret do Supabase e monta o system prompt
+que restringe as respostas a RH/DP. Usamos o Gemini (em vez da Anthropic) porque a API tem camada gratuita
+real — sem cartão de crédito, só limite de requisições por minuto/dia — suficiente para o volume de um chat
+interno de RH.
+
+Para ligar de verdade (precisa do Supabase CLI instalado — `npx supabase`, sem precisar instalar global — e do
+projeto já linkado com `npx supabase link --project-ref xdxiipbhmscitouoaoom`):
+
+```bash
+npx supabase functions deploy ia-corporativa
+npx supabase secrets set GEMINI_API_KEY=AIza...
+```
+
+A chave é gerada gratuitamente em [aistudio.google.com/apikey](https://aistudio.google.com/apikey), com uma
+conta Google — não precisa de cartão para o uso gratuito.
+
+**Sem isso configurado** (modo demo, sem Supabase, ou se a function falhar por qualquer motivo), o chat cai
+automaticamente num respondedor local (`responderLocal` em `src/lib/iaCorporativa.js`) com respostas prontas
+para as perguntas mais comuns de RH/DP — só para o protótipo não ficar mudo, sem depender de API key nenhuma.
 
 ## Sobre os dados das telas (hoje mockados, no formato do SharePoint)
 
@@ -545,10 +783,12 @@ Solides, relógio de ponto, WhatsApp Business, Outlook e Teams.
 src/
   components/     Sidebar, Topbar, Layout, ProtectedRoute, DataTable, StatusBadge
   context/         AuthContext (login, sessão, perfil)
-  lib/             supabaseClient, motor de respostas da IA Corporativa
+  lib/             supabaseClient, motor de respostas da IA Corporativa (RH/DP)
   config/modules.js  Lista de módulos do menu + quem pode acessar cada um
   data/mock/       Dados de exemplo por módulo (formato "planilha SharePoint")
   pages/           Uma pasta por módulo do sistema
+supabase/
+  functions/ia-corporativa/  Edge Function que chama a API do Google Gemini por trás da IA Corporativa
 ```
 
 ## Próximos passos sugeridos
@@ -559,3 +799,5 @@ src/
 - [ ] Obter credenciais do Azure AD/Entra ID para a integração com SharePoint.
 - [ ] Substituir os arquivos de `src/data/mock/` pelas chamadas reais (SharePoint / Domínio Sistemas / Supabase).
 - [ ] Detalhar as regras de acesso por perfil em `src/config/modules.js` junto com o RH da Maxpesa.
+- [ ] Fazer o deploy da Edge Function `ia-corporativa` e configurar o secret `GEMINI_API_KEY` no projeto
+      Supabase real, para a IA Corporativa sair do respondedor local e passar a usar a API do Google Gemini.

@@ -1,6 +1,7 @@
-// Mock estruturado como "Comunicacao/Mural/" no SharePoint.
-// Datas de aniversariantes hoje são mockadas; quando a planilha de colaboradores
-// passar a trazer data de nascimento, essa lista deve vir de rh_colaboradores.
+// Mock estruturado como "Comunicacao/Mural/" no SharePoint — usado só em modo
+// demo (sem Supabase configurado). Com o Supabase real, comunicados vêm de
+// rh_comunicados (src/lib/comunicacaoApi.js) e aniversariantes vêm do campo
+// "Data de nascimento" de rh_colaboradores (ver ComunicacaoInterna.jsx).
 
 export const COMUNICADOS = [
   {

@@ -6,14 +6,26 @@ import Topbar from "./Topbar";
 export default function Layout({ children }) {
   const location = useLocation();
   const [menuAberto, setMenuAberto] = useState(false);
+  const [sidebarRecolhida, setSidebarRecolhida] = useState(
+    () => localStorage.getItem("sidebarRecolhida") === "1"
+  );
 
   useEffect(() => {
     setMenuAberto(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    localStorage.setItem("sidebarRecolhida", sidebarRecolhida ? "1" : "0");
+  }, [sidebarRecolhida]);
+
   return (
-    <div className="app-shell">
-      <Sidebar open={menuAberto} onNavigate={() => setMenuAberto(false)} />
+    <div className={`app-shell ${sidebarRecolhida ? "sidebar-recolhida" : ""}`}>
+      <Sidebar
+        open={menuAberto}
+        onNavigate={() => setMenuAberto(false)}
+        collapsed={sidebarRecolhida}
+        onToggleCollapsed={() => setSidebarRecolhida((v) => !v)}
+      />
       <div className={`sidebar-backdrop ${menuAberto ? "open" : ""}`} onClick={() => setMenuAberto(false)} />
       <div className="app-main">
         <Topbar onMenuClick={() => setMenuAberto((v) => !v)} />

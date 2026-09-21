@@ -3,6 +3,8 @@
 export function formatFilial(filial) {
   if (!filial) return filial;
   if (filial.toUpperCase().startsWith("SARENS")) return "SARENS";
+  if (filial.toUpperCase().startsWith("MAXPESA")) return "MAXPESA";
+  if (filial.toUpperCase().startsWith("CPBS")) return "CPBS";
   return filial.toUpperCase();
 }
 
@@ -56,4 +58,17 @@ export function proximoAniversario(dataNascimentoIso) {
   let alvo = new Date(hoje.getFullYear(), m - 1, d);
   if (alvo < hoje) alvo = new Date(hoje.getFullYear() + 1, m - 1, d);
   return { mes: m, dia: d, dias: Math.round((alvo - hoje) / 86400000) };
+}
+
+// Diferença em dias até o dia/mês de uma data de nascimento *neste ano civil*,
+// sem rolar pro ano seguinte — negativo quando o aniversário já passou este
+// ano. Usado para separar aniversariantes "passados" dos "futuros" no mural
+// (proximoAniversario acima sempre aponta pra frente, então não serve pra isso).
+export function diasNoAno(dataNascimentoIso) {
+  if (!dataNascimentoIso) return null;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const [, m, d] = dataNascimentoIso.split("-").map(Number);
+  const alvo = new Date(hoje.getFullYear(), m - 1, d);
+  return Math.round((alvo - hoje) / 86400000);
 }

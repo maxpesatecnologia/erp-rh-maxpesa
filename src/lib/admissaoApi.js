@@ -1,4 +1,24 @@
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
+import { registrarAuditoria } from "./auditoriaApi";
+
+const TABELA = "rh_admissoes";
+
+// Timestamp + nome de quem fez a ação, gravados direto na linha (além do log
+// em rh_auditoria) — é o que alimenta o UltimaEdicaoBadge sem precisar juntar
+// com a tabela de auditoria toda vez que uma lista é carregada.
+function carimboEdicao(usuario) {
+  return { atualizado_por: usuario?.nome ?? null, atualizado_em: new Date().toISOString() };
+}
+
+// Nunca deve derrubar a ação principal (salvar admissão etc.) — se o log de
+// auditoria falhar, só avisa no console.
+async function auditar(args) {
+  try {
+    await registrarAuditoria(args);
+  } catch (e) {
+    console.warn("Falha ao registrar auditoria:", e.message);
+  }
+}
 
 // Documentos pessoais exigidos na etapa "Upload de documentos" — cada um
 // precisa estar anexado individualmente para a etapa poder ser concluída.
@@ -51,6 +71,8 @@ function paraAdmissao(row) {
     dataPrevista: row.data_prevista || "",
     checklist,
     historico: row.historico || [],
+    atualizadoPor: row.atualizado_por || null,
+    atualizadoEm: row.atualizado_em || null,
   };
 }
 
@@ -70,7 +92,7 @@ export async function listarAdmissoes() {
   return data.map(paraAdmissao);
 }
 
-export async function criarAdmissao(dados) {
+export async function criarAdmissao(dados, usuario) {
   const payload = {
     candidato_id: dados.candidatoId || null,
     nome: dados.nome,
@@ -79,38 +101,51 @@ export async function criarAdmissao(dados) {
     data_prevista: dados.dataPrevista || null,
     checklist: CHECKLIST_PADRAO,
     historico: [],
+    ...carimboEdicao(usuario),
   };
 
   if (!isSupabaseConfigured) {
     const nova = { id: `local-${proximoIdLocal++}`, ...payload };
     admissoesLocais = [...admissoesLocais, nova];
-    return paraAdmissao(nova);
+    const admissao = paraAdmissao(nova);
+    await auditar({ tabela: TABELA, registroId: admissao.id, registroLabel: admissao.nome, acao: "criacao", usuario, depois: dados });
+    return admissao;
   }
 
   const { data, error } = await supabase.from("rh_admissoes").insert(payload).select().single();
   if (error) throw new Error(error.message);
-  return paraAdmissao(data);
+  const admissao = paraAdmissao(data);
+  await auditar({ tabela: TABELA, registroId: admissao.id, registroLabel: admissao.nome, acao: "criacao", usuario, depois: dados });
+  return admissao;
 }
 
-export async function excluirAdmissao(admissaoId) {
+export async function excluirAdmissao(admissaoId, usuario) {
   if (!isSupabaseConfigured) {
+    const admissaoNome = admissoesLocais.find((a) => a.id === admissaoId)?.nome ?? null;
     admissoesLocais = admissoesLocais.filter((a) => a.id !== admissaoId);
+    await auditar({ tabela: TABELA, registroId: admissaoId, registroLabel: admissaoNome, acao: "exclusao", usuario });
     return;
   }
 
-  const { error } = await supabase.from("rh_admissoes").delete().eq("id", admissaoId);
+  const { data, error } = await supabase.from("rh_admissoes").delete().eq("id", admissaoId).select().single();
   if (error) throw new Error(error.message);
+  await auditar({ tabela: TABELA, registroId: admissaoId, registroLabel: data?.nome ?? null, acao: "exclusao", usuario });
 }
 
 // `historico` é opcional — quando informado, é a lista completa (já com a
 // nova entrada) que substitui o histórico salvo. Quem monta cada entrada é
 // a tela (ver criarEntradaHistorico em AdmissaoDigital.jsx).
-export async function atualizarChecklistAdmissao(admissaoId, checklist, historico) {
-  const payload = historico !== undefined ? { checklist, historico } : { checklist };
+export async function atualizarChecklistAdmissao(admissaoId, checklist, historico, usuario) {
+  const payload = {
+    ...(historico !== undefined ? { checklist, historico } : { checklist }),
+    ...carimboEdicao(usuario),
+  };
 
   if (!isSupabaseConfigured) {
     admissoesLocais = admissoesLocais.map((a) => (a.id === admissaoId ? { ...a, ...payload } : a));
-    return paraAdmissao(admissoesLocais.find((a) => a.id === admissaoId));
+    const admissao = paraAdmissao(admissoesLocais.find((a) => a.id === admissaoId));
+    await auditar({ tabela: TABELA, registroId: admissaoId, registroLabel: admissao?.nome, acao: "edicao", usuario, depois: { checklist } });
+    return admissao;
   }
 
   const { data, error } = await supabase
@@ -120,5 +155,7 @@ export async function atualizarChecklistAdmissao(admissaoId, checklist, historic
     .select()
     .single();
   if (error) throw new Error(error.message);
-  return paraAdmissao(data);
+  const admissao = paraAdmissao(data);
+  await auditar({ tabela: TABELA, registroId: admissaoId, registroLabel: admissao.nome, acao: "edicao", usuario, depois: { checklist } });
+  return admissao;
 }

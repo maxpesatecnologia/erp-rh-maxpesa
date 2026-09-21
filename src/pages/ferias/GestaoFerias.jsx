@@ -3,10 +3,12 @@ import { Plus, Check, X as XIcon, CalendarPlus, Undo2, ListChecks, Wallet, Slide
 import Avatar from "../../components/Avatar";
 import DataTable from "../../components/DataTable";
 import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
+import UltimaEdicaoBadge from "../../components/UltimaEdicaoBadge";
 import SolicitarFeriasModal from "./SolicitarFeriasModal";
 import RecusarFeriasModal from "./RecusarFeriasModal";
 import ProrrogarFeriasModal from "./ProrrogarFeriasModal";
 import AjustarSaldoFeriasModal from "./AjustarSaldoFeriasModal";
+import { useAuth } from "../../context/AuthContext";
 import { COLABORADORES } from "../../data/mock/colaboradores";
 import { isSupabaseConfigured } from "../../lib/supabaseClient";
 import { listarColaboradores, atualizarAjusteFeriasColaborador } from "../../lib/colaboradoresApi";
@@ -35,6 +37,7 @@ const GOZO_BADGE = {
 };
 
 export default function GestaoFerias() {
+  const { user } = useAuth();
   const [colaboradores, setColaboradores] = useState(isSupabaseConfigured ? [] : COLABORADORES);
   const [ferias, setFerias] = useState([]);
   const [carregando, setCarregando] = useState(true);
@@ -96,7 +99,7 @@ export default function GestaoFerias() {
     setSalvandoSolicitacao(true);
     setErroSolicitacao("");
     try {
-      const nova = await criarSolicitacaoFerias(dados);
+      const nova = await criarSolicitacaoFerias(dados, user);
       setFerias((atual) => [...atual, nova]);
       setSolicitarAberto(false);
     } catch (e) {
@@ -110,7 +113,7 @@ export default function GestaoFerias() {
     const anterior = item.status;
     setFerias((atual) => atual.map((f) => (f.id === item.id ? { ...f, status: "Aprovada" } : f)));
     try {
-      await aprovarFerias(item.id);
+      await aprovarFerias(item.id, user);
     } catch (e) {
       setFerias((atual) => atual.map((f) => (f.id === item.id ? { ...f, status: anterior } : f)));
       setErro(e.message || "Erro ao aprovar férias.");
@@ -122,7 +125,7 @@ export default function GestaoFerias() {
     setSalvandoRecusa(true);
     setErroRecusa("");
     try {
-      const atualizada = await recusarFerias(feriasRecusando.id, motivo);
+      const atualizada = await recusarFerias(feriasRecusando.id, motivo, user);
       setFerias((atual) => atual.map((f) => (f.id === atualizada.id ? atualizada : f)));
       setFeriasRecusando(null);
     } catch (e) {
@@ -137,7 +140,7 @@ export default function GestaoFerias() {
     setSalvandoProrrogacao(true);
     setErroProrrogacao("");
     try {
-      const atualizada = await prorrogarFerias(feriasProrrogando, novaDataFim, motivo);
+      const atualizada = await prorrogarFerias(feriasProrrogando, novaDataFim, motivo, user);
       setFerias((atual) => atual.map((f) => (f.id === atualizada.id ? atualizada : f)));
       setFeriasProrrogando(null);
     } catch (e) {
@@ -152,7 +155,7 @@ export default function GestaoFerias() {
     setCancelando(true);
     setErroCancelamento("");
     try {
-      const atualizada = await cancelarFerias(feriasCancelando.id, "Cancelada pelo RH");
+      const atualizada = await cancelarFerias(feriasCancelando.id, "Cancelada pelo RH", user);
       setFerias((atual) => atual.map((f) => (f.id === atualizada.id ? atualizada : f)));
       setFeriasCancelando(null);
     } catch (e) {
@@ -168,7 +171,7 @@ export default function GestaoFerias() {
     setErroAjuste("");
     try {
       if (isSupabaseConfigured) {
-        const atualizado = await atualizarAjusteFeriasColaborador(colaboradorAjustando.id, ajusteDias, motivo, historicoOk);
+        const atualizado = await atualizarAjusteFeriasColaborador(colaboradorAjustando.id, ajusteDias, motivo, historicoOk, user);
         setColaboradores((atual) => atual.map((c) => (c.id === atualizado.id ? atualizado : c)));
       } else {
         setColaboradores((atual) =>
@@ -249,6 +252,19 @@ export default function GestaoFerias() {
                 { key: "dias", label: "Dias" },
                 { key: "observacaoColaborador", label: "Observação", render: (r) => r.observacaoColaborador || "—" },
                 {
+                  key: "ultimaEdicao",
+                  label: "Última edição",
+                  render: (r) => (
+                    <UltimaEdicaoBadge
+                      nome={r.atualizadoPor}
+                      data={r.atualizadoEm}
+                      tabela="rh_ferias_solicitacoes"
+                      registroId={r.id}
+                      titulo={r.colaborador?.nome}
+                    />
+                  ),
+                },
+                {
                   key: "acoes",
                   label: "",
                   render: (r) => (
@@ -306,6 +322,19 @@ export default function GestaoFerias() {
                   render: (r) => (r.prorrogacoes.length > 0 ? `${r.prorrogacoes.length}x` : "—"),
                 },
                 {
+                  key: "ultimaEdicao",
+                  label: "Última edição",
+                  render: (r) => (
+                    <UltimaEdicaoBadge
+                      nome={r.atualizadoPor}
+                      data={r.atualizadoEm}
+                      tabela="rh_ferias_solicitacoes"
+                      registroId={r.id}
+                      titulo={r.colaborador?.nome}
+                    />
+                  ),
+                },
+                {
                   key: "acoes",
                   label: "",
                   render: (r) => (
@@ -354,6 +383,19 @@ export default function GestaoFerias() {
                   { key: "periodo", label: "Período", render: (r) => `${formatDate(r.dataInicio)} a ${formatDate(r.dataFim)}` },
                   { key: "status", label: "Status", render: (r) => <span className={`badge ${STATUS_BADGE[r.status]}`}>{r.status}</span> },
                   { key: "observacaoRh", label: "Motivo", render: (r) => r.observacaoRh || "—" },
+                  {
+                    key: "ultimaEdicao",
+                    label: "Última edição",
+                    render: (r) => (
+                      <UltimaEdicaoBadge
+                        nome={r.atualizadoPor}
+                        data={r.atualizadoEm}
+                        tabela="rh_ferias_solicitacoes"
+                        registroId={r.id}
+                        titulo={r.colaborador?.nome}
+                      />
+                    ),
+                  },
                 ]}
                 rows={historico}
                 rowKey="id"

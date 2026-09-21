@@ -4,6 +4,7 @@ import { CalendarClock, CheckCircle2, Circle, Clock, Plus, Trash2, X } from "luc
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import Avatar from "../../components/Avatar";
+import UltimaEdicaoBadge from "../../components/UltimaEdicaoBadge";
 import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
 import IniciarAvaliacaoModal from "./IniciarAvaliacaoModal";
 import { useAuth } from "../../context/AuthContext";
@@ -122,7 +123,7 @@ export default function AvaliacaoDesempenho() {
     setErroEdicao("");
     try {
       const status = statusDaAvaliacao(edicao);
-      const atualizada = await atualizarAvaliacao(selected.id, { competencias: edicao.competencias, metas: edicao.metas, status });
+      const atualizada = await atualizarAvaliacao(selected.id, { competencias: edicao.competencias, metas: edicao.metas, status }, user);
       aplicarAtualizacao(atualizada);
     } catch (erro) {
       setErroEdicao(erro.message || "Erro ao salvar as notas.");
@@ -146,7 +147,7 @@ export default function AvaliacaoDesempenho() {
     setErroEdicao("");
     try {
       const novoPdi = [...selected.pdi, { acao: novaAcaoPdi.trim(), prazo: novoPrazoPdi, status: "pendente" }];
-      const atualizada = await atualizarAvaliacao(selected.id, { pdi: novoPdi });
+      const atualizada = await atualizarAvaliacao(selected.id, { pdi: novoPdi }, user);
       aplicarAtualizacao(atualizada);
       setNovaAcaoPdi("");
       setNovoPrazoPdi("");
@@ -159,7 +160,7 @@ export default function AvaliacaoDesempenho() {
     setErroEdicao("");
     try {
       const novoPdi = selected.pdi.map((p, i) => (i === index ? { ...p, status: novoStatus } : p));
-      const atualizada = await atualizarAvaliacao(selected.id, { pdi: novoPdi });
+      const atualizada = await atualizarAvaliacao(selected.id, { pdi: novoPdi }, user);
       aplicarAtualizacao(atualizada);
     } catch (erro) {
       setErroEdicao(erro.message || "Erro ao atualizar o PDI.");
@@ -170,7 +171,7 @@ export default function AvaliacaoDesempenho() {
     setErroEdicao("");
     try {
       const novoPdi = selected.pdi.filter((_, i) => i !== index);
-      const atualizada = await atualizarAvaliacao(selected.id, { pdi: novoPdi });
+      const atualizada = await atualizarAvaliacao(selected.id, { pdi: novoPdi }, user);
       aplicarAtualizacao(atualizada);
     } catch (erro) {
       setErroEdicao(erro.message || "Erro ao remover ação de PDI.");
@@ -181,7 +182,7 @@ export default function AvaliacaoDesempenho() {
     setSalvandoIniciar(true);
     setErroIniciar("");
     try {
-      const nova = await criarAvaliacao(dados);
+      const nova = await criarAvaliacao(dados, user);
       setAvaliacoes((atual) => [...atual, nova]);
       setIniciarAberto(false);
     } catch (erro) {
@@ -203,7 +204,7 @@ export default function AvaliacaoDesempenho() {
     setExcluindo(true);
     setErroExclusao("");
     try {
-      await excluirAvaliacao(avaliacao.id);
+      await excluirAvaliacao(avaliacao.id, user);
       setAvaliacoes((atual) => atual.filter((a) => a.id !== avaliacao.id));
       if (selected?.id === avaliacao.id) {
         setSelected(null);
@@ -286,6 +287,19 @@ export default function AvaliacaoDesempenho() {
                 },
               },
               { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
+              {
+                key: "ultimaEdicao",
+                label: "Última edição",
+                render: (r) => (
+                  <UltimaEdicaoBadge
+                    nome={r.atualizadoPor}
+                    data={r.atualizadoEm}
+                    tabela="rh_avaliacoes"
+                    registroId={r.id}
+                    titulo={r.colaborador?.nome}
+                  />
+                ),
+              },
               {
                 key: "acao",
                 label: "",

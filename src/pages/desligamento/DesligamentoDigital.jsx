@@ -17,6 +17,7 @@ import DataTable from "../../components/DataTable";
 import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
 import ObservacaoDesligamentoModal from "./ObservacaoDesligamentoModal";
 import HistoricoEtapasModal from "../../components/HistoricoEtapasModal";
+import UltimaEdicaoBadge from "../../components/UltimaEdicaoBadge";
 import AnexarDocumentosModal from "../../components/AnexarDocumentosModal";
 import ImportarDesligamentosForm from "./ImportarDesligamentosForm";
 import { COLABORADORES } from "../../data/mock/colaboradores";
@@ -130,7 +131,7 @@ export default function DesligamentoDigital() {
     const historico = comHistoricoDeMovimento(desligamento, checklist, user);
     setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist, historico } : d)));
     try {
-      await atualizarChecklistDesligamento(desligamento.id, checklist, historico);
+      await atualizarChecklistDesligamento(desligamento.id, checklist, historico, user);
     } catch (e) {
       setDesligamentos((atual) =>
         atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior, historico: historicoAnterior } : d))
@@ -148,7 +149,7 @@ export default function DesligamentoDigital() {
     const historico = comHistoricoDeMovimento(desligamento, checklist, user);
     setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist, historico } : d)));
     try {
-      await atualizarChecklistDesligamento(desligamento.id, checklist, historico);
+      await atualizarChecklistDesligamento(desligamento.id, checklist, historico, user);
     } catch (e) {
       setDesligamentos((atual) =>
         atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior, historico: historicoAnterior } : d))
@@ -167,7 +168,7 @@ export default function DesligamentoDigital() {
     setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist, historico } : d)));
     try {
       await removerDocumentoChecklist(anexoAtual?.path);
-      await atualizarChecklistDesligamento(desligamento.id, checklist, historico);
+      await atualizarChecklistDesligamento(desligamento.id, checklist, historico, user);
     } catch (e) {
       setDesligamentos((atual) =>
         atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior, historico: historicoAnterior } : d))
@@ -200,7 +201,7 @@ export default function DesligamentoDigital() {
     });
     const historico = comHistoricoDeMovimento(desligamento, checklist, user);
     setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, checklist, historico } : d)));
-    atualizarChecklistDesligamento(desligamento.id, checklist, historico).catch((e) => {
+    atualizarChecklistDesligamento(desligamento.id, checklist, historico, user).catch((e) => {
       setDesligamentos((atual) =>
         atual.map((d) => (d.id === desligamento.id ? { ...d, checklist: checklistAnterior, historico: historicoAnterior } : d))
       );
@@ -211,7 +212,7 @@ export default function DesligamentoDigital() {
   async function handleEnviarChecklist(desligamento) {
     setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, emChecklist: true } : d)));
     try {
-      await enviarDesligamentoParaChecklist(desligamento.id);
+      await enviarDesligamentoParaChecklist(desligamento.id, user);
     } catch (e) {
       setDesligamentos((atual) => atual.map((d) => (d.id === desligamento.id ? { ...d, emChecklist: false } : d)));
       setErro(e.message || "Erro ao enviar para o checklist.");
@@ -242,7 +243,7 @@ export default function DesligamentoDigital() {
       setDesligamentos((atual) =>
         atual.map((d) => (d.id === desligamentoObservando.id ? { ...d, observacao } : d))
       );
-      await atualizarObservacaoDesligamento(desligamentoObservando.id, observacao);
+      await atualizarObservacaoDesligamento(desligamentoObservando.id, observacao, user);
       setDesligamentoObservandoId(null);
     } catch (e) {
       setDesligamentos((atual) =>
@@ -271,7 +272,7 @@ export default function DesligamentoDigital() {
     setCancelando(true);
     setErroCancelamento("");
     try {
-      await excluirDesligamento(desligamento.id);
+      await excluirDesligamento(desligamento.id, user);
       if (isSupabaseConfigured) {
         try {
           await atualizarStatusColaborador(desligamento.colaboradorId, "Ativo");
@@ -293,7 +294,7 @@ export default function DesligamentoDigital() {
   }
 
   async function handleImportarDesligamentos(linhas) {
-    const novos = await importarDesligamentos(linhas);
+    const novos = await importarDesligamentos(linhas, user);
     setDesligamentos((atual) => [...atual, ...novos]);
     const colaboradorIds = new Set(linhas.map((l) => l.colaboradorId));
     if (isSupabaseConfigured) {
@@ -477,26 +478,34 @@ export default function DesligamentoDigital() {
                           {desl.emChecklist ? "Enviado ao checklist" : "Enviar para o checklist"}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          marginTop: 8,
-                          width: "100%",
-                          justifyContent: "center",
-                          fontSize: 11,
-                          padding: "5px 8px",
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          abrirHistorico(desl);
-                        }}
-                      >
-                        <History size={12} /> Ver histórico
-                      </button>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
+                        <UltimaEdicaoBadge
+                          nome={desl.atualizadoPor}
+                          data={desl.atualizadoEm}
+                          tabela="rh_desligamentos"
+                          registroId={desl.id}
+                          titulo={colaborador?.nome}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            width: "100%",
+                            justifyContent: "center",
+                            fontSize: 11,
+                            padding: "5px 8px",
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            abrirHistorico(desl);
+                          }}
+                        >
+                          <History size={12} /> Ver histórico
+                        </button>
+                      </div>
                       <button
                         type="button"
                         className="btn btn-outline"
