@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -7,17 +7,16 @@ import {
   Undo2,
   ListChecks,
   Kanban,
-  Paperclip,
   Users,
   Upload,
-  History,
+  Ellipsis,
 } from "lucide-react";
 import Avatar from "../../components/Avatar";
 import DataTable from "../../components/DataTable";
 import ConfirmDeleteModal from "../../components/ConfirmDeleteModal";
 import ObservacaoDesligamentoModal from "./ObservacaoDesligamentoModal";
+import AcoesCardModal from "./AcoesCardModal";
 import HistoricoEtapasModal from "../../components/HistoricoEtapasModal";
-import UltimaEdicaoBadge from "../../components/UltimaEdicaoBadge";
 import AnexarDocumentosModal from "../../components/AnexarDocumentosModal";
 import ImportarDesligamentosForm from "./ImportarDesligamentosForm";
 import { COLABORADORES } from "../../data/mock/colaboradores";
@@ -100,12 +99,26 @@ export default function DesligamentoDigital() {
   const [importAberto, setImportAberto] = useState(false);
   const [importVisitado, setImportVisitado] = useState(false);
   const [historicoId, setHistoricoId] = useState(null);
+  const [acoesCard, setAcoesCard] = useState(null);
+  const kanbanRef = useRef(null);
+  const [sombraEsquerda, setSombraEsquerda] = useState(false);
+  const [sombraDireita, setSombraDireita] = useState(false);
+
+  const atualizarSombrasKanban = useCallback(() => {
+    const el = kanbanRef.current;
+    if (!el) return;
+    setSombraEsquerda(el.scrollLeft > 4);
+    setSombraDireita(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
 
   const desligamentosNoChecklist = desligamentos.filter((d) => d.emChecklist);
   const desligamentoObservando = desligamentos.find((d) => d.id === desligamentoObservandoId) ?? null;
   const desligamentoHistorico = desligamentos.find((d) => d.id === historicoId) ?? null;
   const desligamentoDocumento = documentoEtapa
     ? desligamentos.find((d) => d.id === documentoEtapa.desligamentoId) ?? null
+    : null;
+  const desligamentoAcoes = acoesCard
+    ? desligamentos.find((d) => d.id === acoesCard.desligamentoId) ?? null
     : null;
 
   useEffect(() => {
@@ -119,6 +132,13 @@ export default function DesligamentoDigital() {
       .catch((e) => setErro(e.message || "Erro ao carregar desligamentos."));
     Promise.all([carregarColaboradores, carregarDesligamentos]).finally(() => setCarregando(false));
   }, []);
+
+  useEffect(() => {
+    if (visualizacao !== "kanban") return;
+    atualizarSombrasKanban();
+    window.addEventListener("resize", atualizarSombrasKanban);
+    return () => window.removeEventListener("resize", atualizarSombrasKanban);
+  }, [visualizacao, desligamentos, atualizarSombrasKanban]);
 
   async function handleToggleEtapa(desligamento, chave) {
     if (DOCUMENTOS_ETAPAS_DESLIGAMENTO[chave]) {
@@ -378,7 +398,10 @@ export default function DesligamentoDigital() {
           Cadastro de Colaboradores.
         </div>
       ) : visualizacao === "kanban" ? (
-        <div className="kanban-board">
+        <div className="kanban-board-wrap">
+          <div className={"kanban-scroll-shadow kanban-scroll-shadow-left" + (sombraEsquerda ? " visible" : "")} />
+          <div className={"kanban-scroll-shadow kanban-scroll-shadow-right" + (sombraDireita ? " visible" : "")} />
+          <div className="kanban-board" ref={kanbanRef} onScroll={atualizarSombrasKanban}>
           {COLUNAS_KANBAN.map((coluna) => {
             const itens = desligamentos.filter((d) => getColunaAtual(d.checklist) === coluna.id);
             return (
@@ -399,6 +422,7 @@ export default function DesligamentoDigital() {
                   {coluna.titulo}{" "}
                   <span style={{ color: "var(--color-text-muted)", fontWeight: 400 }}>({itens.length})</span>
                 </div>
+                <div className="kanban-column-body">
                 {itens.length === 0 && (
                   <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>Nenhum colaborador nesta etapa.</div>
                 )}
@@ -432,80 +456,6 @@ export default function DesligamentoDigital() {
                       <div className={"kanban-card-fase" + (desl.observacao ? " kanban-card-fase-preenchida" : "")}>
                         {desl.observacao || "Clique para ver e editar…"}
                       </div>
-                      {DOCUMENTOS_ETAPAS_DESLIGAMENTO[coluna.id] && (
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            marginTop: 8,
-                            width: "100%",
-                            justifyContent: "center",
-                            fontSize: 12,
-                            padding: "6px 10px",
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDocumentoEtapa({ desligamentoId: desl.id, chave: coluna.id });
-                          }}
-                        >
-                          <Paperclip size={13} /> Anexar documento
-                        </button>
-                      )}
-                      {coluna.id === COLUNA_CONCLUIDO && (
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            marginTop: 8,
-                            width: "100%",
-                            justifyContent: "center",
-                            fontSize: 12,
-                            padding: "6px 10px",
-                          }}
-                          disabled={desl.emChecklist}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEnviarChecklist(desl);
-                          }}
-                        >
-                          <ListChecks size={13} />
-                          {desl.emChecklist ? "Enviado ao checklist" : "Enviar para o checklist"}
-                        </button>
-                      )}
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}>
-                        <UltimaEdicaoBadge
-                          nome={desl.atualizadoPor}
-                          data={desl.atualizadoEm}
-                          tabela="rh_desligamentos"
-                          registroId={desl.id}
-                          titulo={colaborador?.nome}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 6,
-                            width: "100%",
-                            justifyContent: "center",
-                            fontSize: 11,
-                            padding: "5px 8px",
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            abrirHistorico(desl);
-                          }}
-                        >
-                          <History size={12} /> Ver histórico
-                        </button>
-                      </div>
                       <button
                         type="button"
                         className="btn btn-outline"
@@ -521,17 +471,19 @@ export default function DesligamentoDigital() {
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleCancelar(desl);
+                          setAcoesCard({ desligamentoId: desl.id, colunaId: coluna.id });
                         }}
                       >
-                        <Undo2 size={12} /> Cancelar
+                        <Ellipsis size={12} /> Ações
                       </button>
                     </div>
                   );
                 })}
+                </div>
               </div>
             );
           })}
+          </div>
         </div>
       ) : visualizacao === "checklist" ? (
         desligamentosNoChecklist.length === 0 ? (
@@ -699,6 +651,32 @@ export default function DesligamentoDigital() {
           onAnexar={(_docChave, arquivo) => handleAnexarDocumentoEtapa(desligamentoDocumento, documentoEtapa.chave, arquivo)}
           onRemover={() => handleRemoverDocumentoEtapa(desligamentoDocumento, documentoEtapa.chave)}
           onFechar={() => setDocumentoEtapa(null)}
+        />
+      )}
+
+      {desligamentoAcoes && (
+        <AcoesCardModal
+          colaborador={colaboradores.find((c) => c.id === desligamentoAcoes.colaboradorId)}
+          desligamento={desligamentoAcoes}
+          temDocumento={Boolean(DOCUMENTOS_ETAPAS_DESLIGAMENTO[acoesCard.colunaId])}
+          isConcluido={acoesCard.colunaId === COLUNA_CONCLUIDO}
+          onAnexarDocumento={() => {
+            setDocumentoEtapa({ desligamentoId: desligamentoAcoes.id, chave: acoesCard.colunaId });
+            setAcoesCard(null);
+          }}
+          onEnviarChecklist={() => {
+            handleEnviarChecklist(desligamentoAcoes);
+            setAcoesCard(null);
+          }}
+          onVerHistorico={() => {
+            abrirHistorico(desligamentoAcoes);
+            setAcoesCard(null);
+          }}
+          onCancelar={() => {
+            handleCancelar(desligamentoAcoes);
+            setAcoesCard(null);
+          }}
+          onFechar={() => setAcoesCard(null)}
         />
       )}
 

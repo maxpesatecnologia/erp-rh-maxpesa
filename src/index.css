@@ -2485,7 +2485,21 @@ table.data-table tbody tr:hover {
 
 .kanban-column {
   min-height: 120px;
+  max-height: calc(100vh - 300px);
+  display: flex;
+  flex-direction: column;
   transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.kanban-column-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 2px;
+}
+
+.kanban-board-wrap {
+  position: relative;
 }
 
 .kanban-board {
@@ -2504,6 +2518,31 @@ table.data-table tbody tr:hover {
 .kanban-column-over {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
+}
+
+.kanban-scroll-shadow {
+  position: absolute;
+  top: 0;
+  bottom: 6px;
+  width: 48px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 1;
+}
+
+.kanban-scroll-shadow-left {
+  left: 0;
+  background: linear-gradient(to right, var(--color-bg), transparent);
+}
+
+.kanban-scroll-shadow-right {
+  right: 0;
+  background: linear-gradient(to left, var(--color-bg), transparent);
+}
+
+.kanban-scroll-shadow.visible {
+  opacity: 1;
 }
 
 /* ---------- Charts: shared legend / tooltip / gridlines ---------- */

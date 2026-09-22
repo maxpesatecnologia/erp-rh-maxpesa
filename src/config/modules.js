@@ -7,12 +7,10 @@ import {
   IdCard,
   Target,
   FileText,
-  GraduationCap,
   TrendingUp,
   UserMinus,
   FolderOpen,
   Truck,
-  ShieldCheck,
   Stethoscope,
   HardHat,
   Users2,
@@ -87,12 +85,6 @@ export const NAV_SECTIONS = [
         roles: ["admin", "rh"],
       },
       {
-        path: "/treinamentos",
-        label: "Treinamentos",
-        icon: GraduationCap,
-        roles: ["admin", "rh", "gestor", "colaborador"],
-      },
-      {
         path: "/avaliacao-desempenho",
         label: "Avaliação de Desempenho",
         icon: TrendingUp,
@@ -109,12 +101,6 @@ export const NAV_SECTIONS = [
   {
     title: "Operação Maxpesa",
     items: [
-      {
-        path: "/seguranca",
-        label: "Segurança do Trabalho",
-        icon: ShieldCheck,
-        roles: ["admin", "rh", "gestor"],
-      },
       {
         path: "/medicina",
         label: "Gestão de ASOs",

@@ -13,6 +13,7 @@ export default function GestaoEPIs() {
   const [ultimaSincronizacao, setUltimaSincronizacao] = useState(null);
   const [busca, setBusca] = useState("");
   const [empresa, setEmpresa] = useState("Todos");
+  const [status, setStatus] = useState("Todos");
   const [expandido, setExpandido] = useState(null);
 
   async function sincronizar() {
@@ -44,13 +45,15 @@ export default function GestaoEPIs() {
     const termo = busca.trim().toLowerCase();
     let lista = colaboradores;
     if (empresa !== "Todos") lista = lista.filter((c) => c.empresa === empresa);
+    if (status === "Com EPI") lista = lista.filter((c) => c.epis.length > 0);
+    if (status === "Sem EPI") lista = lista.filter((c) => c.epis.length === 0);
     if (termo) {
       lista = lista.filter((c) =>
         [c.nome, c.cargo, c.setor].some((campo) => String(campo || "").toLowerCase().includes(termo))
       );
     }
     return lista;
-  }, [colaboradores, busca, empresa]);
+  }, [colaboradores, busca, empresa, status]);
 
   const totais = useMemo(
     () => ({
@@ -116,6 +119,15 @@ export default function GestaoEPIs() {
               placeholder="Buscar colaborador ou setor…"
               aria-label="Buscar colaborador"
             />
+          </div>
+        </div>
+        <div className="filter-row" style={{ marginTop: 10 }}>
+          <div className="seg-toggle">
+            {["Todos", "Com EPI", "Sem EPI"].map((s) => (
+              <button key={s} type="button" className={status === s ? "active" : ""} onClick={() => setStatus(s)}>
+                {s}
+              </button>
+            ))}
           </div>
         </div>
 

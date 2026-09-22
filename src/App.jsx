@@ -13,10 +13,8 @@ import AdmissaoDigital from "./pages/admissao/AdmissaoDigital";
 import Documentos from "./pages/documentos/Documentos";
 import DesligamentoDigital from "./pages/desligamento/DesligamentoDigital";
 import GestaoFerias from "./pages/ferias/GestaoFerias";
-import Treinamentos from "./pages/treinamentos/Treinamentos";
 import AvaliacaoDesempenho from "./pages/avaliacao/AvaliacaoDesempenho";
 import Competencias from "./pages/competencias/Competencias";
-import SegurancaTrabalho from "./pages/seguranca/SegurancaTrabalho";
 import MedicinaOcupacional from "./pages/medicina/MedicinaOcupacional";
 import GestaoEPIs from "./pages/epis/GestaoEPIs";
 import GestaoEquipes from "./pages/equipes/GestaoEquipes";
@@ -46,10 +44,8 @@ export default function App() {
           <Route path="/documentos" element={withLayout(<Documentos />)} />
           <Route path="/desligamento" element={withLayout(<DesligamentoDigital />)} />
           <Route path="/ferias" element={withLayout(<GestaoFerias />)} />
-          <Route path="/treinamentos" element={withLayout(<Treinamentos />)} />
           <Route path="/avaliacao-desempenho" element={withLayout(<AvaliacaoDesempenho />)} />
           <Route path="/operadores" element={withLayout(<Competencias />)} />
-          <Route path="/seguranca" element={withLayout(<SegurancaTrabalho />)} />
           <Route path="/medicina" element={withLayout(<MedicinaOcupacional />)} />
           <Route path="/epis" element={withLayout(<GestaoEPIs />)} />
           <Route path="/equipes" element={withLayout(<GestaoEquipes />)} />
