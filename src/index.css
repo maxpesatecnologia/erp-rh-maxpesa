@@ -1391,8 +1391,9 @@ table.data-table tbody tr:hover {
   background: none;
 }
 
-.modal-card-large {
-  max-width: 640px;
+.modal-card.modal-card-large {
+  width: 100%;
+  max-width: 1240px;
   max-height: 90vh;
   overflow-y: auto;
   text-align: left;

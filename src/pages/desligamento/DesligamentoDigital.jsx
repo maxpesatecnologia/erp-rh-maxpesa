@@ -568,6 +568,7 @@ export default function DesligamentoDigital() {
         </div>
         )
       ) : (
+        <div className="card card-pad">
         <DataTable
           columns={[
             {
@@ -636,6 +637,7 @@ export default function DesligamentoDigital() {
           rows={desligamentos}
           rowKey="id"
         />
+        </div>
       )}
 
       {desligamentoDocumento && (
