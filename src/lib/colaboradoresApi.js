@@ -205,7 +205,10 @@ export async function atualizarStatusColaborador(matricula, status, usuario) {
 
 // Atualiza só a coluna de documentos — usado pela aba Documentos, sem passar
 // pelo resto do cadastro (que não deve ser tocado ao anexar um arquivo).
-export async function atualizarDocumentosColaborador(matricula, documentos, usuario) {
+// `documentosAnterior` é opcional mas quem chama sempre tem ele à mão (estado
+// antes do anexo/remoção) — sem ele o histórico só registra "documentos:
+// atualizado", sem dizer qual documento mudou.
+export async function atualizarDocumentosColaborador(matricula, documentos, usuario, documentosAnterior) {
   const { data, error } = await supabase
     .from("rh_colaboradores")
     .update({ documentos, ...carimboEdicao(usuario) })
@@ -220,7 +223,8 @@ export async function atualizarDocumentosColaborador(matricula, documentos, usua
     registroLabel: colaborador.nome,
     acao: "edicao",
     usuario,
-    depois: { documentos: "atualizado" },
+    antes: documentosAnterior !== undefined ? { documentos: documentosAnterior } : undefined,
+    depois: { documentos },
   });
   return colaborador;
 }

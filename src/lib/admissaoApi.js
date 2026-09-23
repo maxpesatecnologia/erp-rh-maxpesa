@@ -135,16 +135,22 @@ export async function excluirAdmissao(admissaoId, usuario) {
 // `historico` é opcional — quando informado, é a lista completa (já com a
 // nova entrada) que substitui o histórico salvo. Quem monta cada entrada é
 // a tela (ver criarEntradaHistorico em AdmissaoDigital.jsx).
-export async function atualizarChecklistAdmissao(admissaoId, checklist, historico, usuario) {
+// `checklistAnterior` é opcional mas quem chama sempre tem ele à mão (é o
+// checklist antes do toggle/anexo) — sem ele, o diff de auditoria não tem
+// "antes" pra comparar e mostra TODAS as chaves do checklist como alteradas
+// em toda edição, mesmo as etapas que nem foram tocadas (ex.: exame
+// admissional aparecendo "alterado" só porque alguém anexou um documento).
+export async function atualizarChecklistAdmissao(admissaoId, checklist, historico, usuario, checklistAnterior) {
   const payload = {
     ...(historico !== undefined ? { checklist, historico } : { checklist }),
     ...carimboEdicao(usuario),
   };
+  const antes = checklistAnterior !== undefined ? { checklist: checklistAnterior } : undefined;
 
   if (!isSupabaseConfigured) {
     admissoesLocais = admissoesLocais.map((a) => (a.id === admissaoId ? { ...a, ...payload } : a));
     const admissao = paraAdmissao(admissoesLocais.find((a) => a.id === admissaoId));
-    await auditar({ tabela: TABELA, registroId: admissaoId, registroLabel: admissao?.nome, acao: "edicao", usuario, depois: { checklist } });
+    await auditar({ tabela: TABELA, registroId: admissaoId, registroLabel: admissao?.nome, acao: "edicao", usuario, antes, depois: { checklist } });
     return admissao;
   }
 
@@ -156,6 +162,6 @@ export async function atualizarChecklistAdmissao(admissaoId, checklist, historic
     .single();
   if (error) throw new Error(error.message);
   const admissao = paraAdmissao(data);
-  await auditar({ tabela: TABELA, registroId: admissaoId, registroLabel: admissao.nome, acao: "edicao", usuario, depois: { checklist } });
+  await auditar({ tabela: TABELA, registroId: admissaoId, registroLabel: admissao.nome, acao: "edicao", usuario, antes, depois: { checklist } });
   return admissao;
 }

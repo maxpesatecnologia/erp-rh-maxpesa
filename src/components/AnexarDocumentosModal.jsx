@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Paperclip, UploadCloud, Trash2, ExternalLink, Plus, FileX2 } from "lucide-react";
 import { obterUrlDocumentoChecklist } from "../lib/documentosChecklistApi";
+import UltimaEdicaoBadge from "./UltimaEdicaoBadge";
 
 // Modal genérico para anexar um ou mais documentos de uma etapa de checklist
 // (Admissão/Desligamento) ou do repositório por colaborador (aba Documentos)
@@ -20,6 +21,12 @@ export default function AnexarDocumentosModal({
   onFechar,
   onCriarDocumento,
   onExcluirDocumento,
+  // Opcional: { nome, data, tabela, registroId } de quem editou por último o
+  // registro dono desses documentos (ex.: colaborador). Quando presente, some
+  // um botãozinho de histórico no cabeçalho (mesmo esquema do UltimaEdicaoBadge
+  // usado nas listas) — omitido nos modais de checklist de Admissão/Desligamento,
+  // que já têm seu próprio "Ver histórico".
+  historico,
 }) {
   const [chaveEmAndamento, setChaveEmAndamento] = useState(null);
   const [erro, setErro] = useState("");
@@ -109,11 +116,23 @@ export default function AnexarDocumentosModal({
         className={`modal-card ${documentos.length > 1 ? "modal-card-large" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, gap: 8 }}>
           <h3 style={{ margin: 0 }}>{titulo}</h3>
-          <button type="button" className="icon-btn" aria-label="Fechar" onClick={onFechar}>
-            <X size={18} />
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            {historico && (
+              <UltimaEdicaoBadge
+                iconOnly
+                nome={historico.nome}
+                data={historico.data}
+                tabela={historico.tabela}
+                registroId={historico.registroId}
+                titulo={historico.titulo}
+              />
+            )}
+            <button type="button" className="icon-btn" aria-label="Fechar" onClick={onFechar}>
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         <p className="section-hint" style={{ marginTop: 0, marginBottom: 16 }}>
@@ -136,7 +155,7 @@ export default function AnexarDocumentosModal({
                       <Paperclip size={16} />
                     </div>
                     <div className="doc-row-info">
-                      <div className="doc-row-title">{doc.label}</div>
+                      <div className="doc-row-title" title={doc.label}>{doc.label}</div>
                       <div className="doc-row-meta">
                         {grupoCarregando ? "Processando…" : `${lista.length} anexado(s)`}
                       </div>
@@ -162,7 +181,11 @@ export default function AnexarDocumentosModal({
                         const itemCarregando = chaveEmAndamento === `${doc.chave}:${indice}`;
                         return (
                           <div key={indice} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                            <span className="doc-row-meta" style={{ marginTop: 0 }}>
+                            <span
+                              className="doc-row-meta"
+                              style={{ marginTop: 0, flex: 1, minWidth: 0 }}
+                              title={item.nome}
+                            >
                               {itemCarregando ? "Removendo…" : item.nome}
                             </span>
                             <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
@@ -206,8 +229,8 @@ export default function AnexarDocumentosModal({
                   <Paperclip size={16} />
                 </div>
                 <div className="doc-row-info">
-                  <div className="doc-row-title">{doc.label}</div>
-                  <div className="doc-row-meta">
+                  <div className="doc-row-title" title={doc.label}>{doc.label}</div>
+                  <div className="doc-row-meta" title={anexo ? anexo.nome : undefined}>
                     {carregando ? "Processando…" : anexo ? anexo.nome : "Nenhum arquivo anexado"}
                   </div>
                 </div>

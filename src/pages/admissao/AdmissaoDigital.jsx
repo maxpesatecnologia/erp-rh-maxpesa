@@ -127,7 +127,7 @@ export default function AdmissaoDigital() {
     const historico = comHistoricoDeMovimento(admissao, checklist, user);
     setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist, historico } : a)));
     try {
-      await atualizarChecklistAdmissao(admissao.id, checklist, historico, user);
+      await atualizarChecklistAdmissao(admissao.id, checklist, historico, user, checklistAnterior);
     } catch (e) {
       setAdmissoes((atual) =>
         atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior, historico: historicoAnterior } : a))
@@ -147,7 +147,7 @@ export default function AdmissaoDigital() {
     const historico = comHistoricoDeMovimento(admissao, checklist, user);
     setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist, historico } : a)));
     try {
-      await atualizarChecklistAdmissao(admissao.id, checklist, historico, user);
+      await atualizarChecklistAdmissao(admissao.id, checklist, historico, user, checklistAnterior);
     } catch (e) {
       setAdmissoes((atual) =>
         atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior, historico: historicoAnterior } : a))
@@ -171,7 +171,7 @@ export default function AdmissaoDigital() {
     setAdmissoes((atual) => atual.map((a) => (a.id === admissao.id ? { ...a, checklist, historico } : a)));
     try {
       await removerDocumentoChecklist(anexoRemovido?.path);
-      await atualizarChecklistAdmissao(admissao.id, checklist, historico, user);
+      await atualizarChecklistAdmissao(admissao.id, checklist, historico, user, checklistAnterior);
     } catch (e) {
       setAdmissoes((atual) =>
         atual.map((a) => (a.id === admissao.id ? { ...a, checklist: checklistAnterior, historico: historicoAnterior } : a))
@@ -236,6 +236,7 @@ export default function AdmissaoDigital() {
                     tabela="rh_admissoes"
                     registroId={adm.id}
                     titulo={adm.nome}
+                    iconOnly
                   />
                   <button
                     type="button"

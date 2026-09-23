@@ -53,7 +53,7 @@ export default function EnviarDocumentosPanel() {
 
         <label className="upload-drop" htmlFor="portal-upload-input">
           <UploadCloud size={22} />
-          <span>{arquivo ? arquivo.name : "Clique para selecionar um arquivo (PDF, JPG ou PNG)"}</span>
+          <span className="file-name" title={arquivo ? arquivo.name : undefined}>{arquivo ? arquivo.name : "Clique para selecionar um arquivo (PDF, JPG ou PNG)"}</span>
           <input
             id="portal-upload-input"
             ref={inputRef}
@@ -80,7 +80,7 @@ export default function EnviarDocumentosPanel() {
                 <FileText size={16} />
               </div>
               <div className="doc-row-info">
-                <div className="doc-row-title">{doc.nome}</div>
+                <div className="doc-row-title" title={doc.nome}>{doc.nome}</div>
                 <div className="doc-row-meta">{doc.tipo} · enviado em {formatDate(doc.enviadoEm)}</div>
               </div>
               <span className={`badge ${STATUS_BADGE[doc.status]}`}>{doc.status}</span>

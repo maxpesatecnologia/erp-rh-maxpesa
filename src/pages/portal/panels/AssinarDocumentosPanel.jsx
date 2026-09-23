@@ -31,7 +31,7 @@ export default function AssinarDocumentosPanel() {
               <PenLine size={16} />
             </div>
             <div className="doc-row-info">
-              <div className="doc-row-title">{doc.nome}</div>
+              <div className="doc-row-title" title={doc.nome}>{doc.nome}</div>
               <div className="doc-row-meta">{doc.tipo} · enviado em {formatDate(doc.enviadoEm)}</div>
             </div>
             <button className="btn btn-primary" onClick={() => assinar(doc)}>
@@ -51,7 +51,7 @@ export default function AssinarDocumentosPanel() {
                   <FileCheck2 size={16} />
                 </div>
                 <div className="doc-row-info">
-                  <div className="doc-row-title">{doc.nome}</div>
+                  <div className="doc-row-title" title={doc.nome}>{doc.nome}</div>
                   <div className="doc-row-meta">{doc.tipo} · assinado em {formatDate(doc.assinadoEm)}</div>
                 </div>
                 <span className="badge badge-success">Assinado</span>

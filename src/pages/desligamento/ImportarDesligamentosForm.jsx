@@ -296,7 +296,7 @@ export default function ImportarDesligamentosForm({ colaboradores, onImportar, o
 
       <label className="upload-drop" htmlFor="import-desligamentos-input">
         <UploadCloud size={22} />
-        <span>{arquivo ? arquivo.name : "Clique para selecionar um arquivo .csv, .xlsx ou .xls"}</span>
+        <span className="file-name" title={arquivo ? arquivo.name : undefined}>{arquivo ? arquivo.name : "Clique para selecionar um arquivo .csv, .xlsx ou .xls"}</span>
         <input
           id="import-desligamentos-input"
           type="file"

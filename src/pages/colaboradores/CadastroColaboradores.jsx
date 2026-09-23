@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Plus, Search, Upload, X } from "lucide-react";
+import { Plus, Search, Upload, X, MoreVertical } from "lucide-react";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import Avatar from "../../components/Avatar";
@@ -103,8 +104,15 @@ export default function CadastroColaboradores() {
   const cardRef = useRef(null);
   const [formAberto, setFormAberto] = useState(false);
   const [formVisitado, setFormVisitado] = useState(false);
+  const [formEmModal, setFormEmModal] = useState(false);
   const [colaboradorEditando, setColaboradorEditando] = useState(null);
   const [dadosIniciaisForm, setDadosIniciaisForm] = useState(null);
+  // Menu "⋮" da linha (Desligar/Excluir) — guarda o id do colaborador com o
+  // menu aberto e a posição calculada a partir do botão, já que o menu é
+  // renderizado num portal (position: fixed) pra não ser cortado pelo
+  // overflow-x:auto do wrapper da tabela.
+  const [menuAcoesId, setMenuAcoesId] = useState(null);
+  const [menuAcoesPos, setMenuAcoesPos] = useState({ top: 0, right: 0 });
   const [importAberto, setImportAberto] = useState(false);
   const [importVisitado, setImportVisitado] = useState(false);
   const [colaboradorParaExcluir, setColaboradorParaExcluir] = useState(null);
@@ -200,16 +208,34 @@ export default function CadastroColaboradores() {
 
   function fecharForm() {
     setFormAberto(false);
+    setFormEmModal(false);
     setColaboradorEditando(null);
     setDadosIniciaisForm(null);
   }
 
+  // "Editar" abre o formulário num modal (em vez de rolar pro topo da página,
+  // onde fica o formulário de "Novo colaborador") — só esse último continua
+  // usando o formulário inline.
   function handleEditar(colaborador) {
     setColaboradorEditando(colaborador);
     setDadosIniciaisForm(null);
     setFormVisitado(true);
+    setFormEmModal(true);
     setFormAberto(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function abrirMenuAcoes(colaborador, event) {
+    if (menuAcoesId === colaborador.id) {
+      setMenuAcoesId(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    setMenuAcoesPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    setMenuAcoesId(colaborador.id);
+  }
+
+  function fecharMenuAcoes() {
+    setMenuAcoesId(null);
   }
 
   // Backfill/correção da data de demissão de quem já está "Desligado" (ver
@@ -512,6 +538,7 @@ export default function CadastroColaboradores() {
               setColaboradorEditando(null);
               setDadosIniciaisForm(null);
               setFormVisitado(true);
+              setFormEmModal(false);
               setFormAberto((v) => !v);
             }}
           >
@@ -536,14 +563,14 @@ export default function CadastroColaboradores() {
         </div>
       </div>
 
-      <div className={`collapse ${formAberto ? "open" : ""}`}>
+      <div className={`collapse ${formAberto && !formEmModal ? "open" : ""}`}>
         <div className="collapse-inner">
-          {formVisitado && (
+          {formVisitado && !formEmModal && (
             <div className="collapse-content">
               <NovoColaboradorForm
-                key={colaboradorEditando?.id ?? (dadosIniciaisForm ? "novo-prefill" : "novo")}
-                colaborador={colaboradorEditando}
-                desligamento={colaboradorEditando ? desligamentoDoColaborador(colaboradorEditando.id) : null}
+                key={dadosIniciaisForm ? "novo-prefill" : "novo"}
+                colaborador={null}
+                desligamento={null}
                 dadosIniciais={dadosIniciaisForm}
                 onCancelar={fecharForm}
                 onSalvar={handleSalvar}
@@ -552,6 +579,29 @@ export default function CadastroColaboradores() {
           )}
         </div>
       </div>
+
+      {formAberto && formEmModal && colaboradorEditando &&
+        createPortal(
+          <div className="modal-backdrop" onClick={fecharForm}>
+            <div className="modal-card modal-card-large" onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+                <h3 style={{ margin: 0 }}>Editar colaborador — {colaboradorEditando.nome}</h3>
+                <button type="button" className="icon-btn" aria-label="Fechar" onClick={fecharForm}>
+                  <X size={18} />
+                </button>
+              </div>
+              <NovoColaboradorForm
+                key={colaboradorEditando.id}
+                colaborador={colaboradorEditando}
+                desligamento={desligamentoDoColaborador(colaboradorEditando.id)}
+                dadosIniciais={null}
+                onCancelar={fecharForm}
+                onSalvar={handleSalvar}
+              />
+            </div>
+          </div>,
+          document.body
+        )}
 
       <div className="card card-pad" style={{ position: "relative" }} ref={cardRef}>
         <div className="section-title">Colaboradores</div>
@@ -644,24 +694,26 @@ export default function CadastroColaboradores() {
             { key: "codigoDominio", label: "Código Domínio", render: (r) => r.codigoDominio || "—" },
             { key: "cargo", label: "Cargo" },
             { key: "filial", label: "Filial", render: (r) => formatFilial(r.filial) },
-            { key: "gestor", label: "Gestor" },
             { key: "status", label: "Status", render: (r) => <StatusBadge status={r.status} /> },
             {
               key: "ultimaEdicao",
               label: "Última edição",
               render: (r) => (
-                <UltimaEdicaoBadge
-                  nome={r.atualizadoPor}
-                  data={r.atualizadoEm}
-                  tabela="rh_colaboradores"
-                  registroId={r.id}
-                  titulo={r.nome}
-                />
+                <div style={{ display: "flex", justifyContent: "center" }}>
+                  <UltimaEdicaoBadge
+                    nome={r.atualizadoPor}
+                    data={r.atualizadoEm}
+                    tabela="rh_colaboradores"
+                    registroId={r.id}
+                    titulo={r.nome}
+                    iconOnly
+                  />
+                </div>
               ),
             },
             {
               key: "acao",
-              label: "",
+              label: "Alterações",
               render: (r) => (
                 <div style={{ display: "flex", gap: 6 }}>
                   <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => handleEditar(r)}>
@@ -670,21 +722,14 @@ export default function CadastroColaboradores() {
                   <button className="btn btn-outline" style={{ padding: "5px 10px", fontSize: 12 }} onClick={(e) => handleVerTimeline(r, e)}>
                     {selected?.id === r.id && timelineAberta ? "Ocultar timeline" : "Ver timeline"}
                   </button>
-                  {r.status !== "Desligado" && (
-                    <button
-                      className="btn btn-outline"
-                      style={{ padding: "5px 10px", fontSize: 12 }}
-                      onClick={() => handleDesligar(r)}
-                    >
-                      Desligar
-                    </button>
-                  )}
                   <button
-                    className="btn btn-outline"
-                    style={{ padding: "5px 10px", fontSize: 12, color: "var(--color-danger)" }}
-                    onClick={() => handleExcluir(r)}
+                    type="button"
+                    className="icon-btn"
+                    aria-label="Mais ações"
+                    title="Mais ações"
+                    onClick={(e) => abrirMenuAcoes(r, e)}
                   >
-                    Excluir
+                    <MoreVertical size={15} />
                   </button>
                 </div>
               ),
@@ -693,6 +738,49 @@ export default function CadastroColaboradores() {
           rows={colaboradoresFiltrados}
         />
         )}
+
+        {menuAcoesId &&
+          createPortal(
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 999 }} onClick={fecharMenuAcoes} />
+              <div
+                className="acoes-menu"
+                style={{ top: menuAcoesPos.top, right: menuAcoesPos.right }}
+              >
+                {(() => {
+                  const colaborador = colaboradoresFiltrados.find((c) => c.id === menuAcoesId);
+                  if (!colaborador) return null;
+                  return (
+                    <>
+                      {colaborador.status !== "Desligado" && (
+                        <button
+                          type="button"
+                          className="acoes-menu-item"
+                          onClick={() => {
+                            fecharMenuAcoes();
+                            handleDesligar(colaborador);
+                          }}
+                        >
+                          Desligar
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="acoes-menu-item acoes-menu-item-danger"
+                        onClick={() => {
+                          fecharMenuAcoes();
+                          handleExcluir(colaborador);
+                        }}
+                      >
+                        Excluir
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+            </>,
+            document.body
+          )}
 
         {timelineAberta && selected && (
           <div

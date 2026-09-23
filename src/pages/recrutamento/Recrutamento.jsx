@@ -811,8 +811,8 @@ export default function Recrutamento() {
                               <FileText size={16} />
                             </div>
                             <div className="doc-row-info">
-                              <div className="doc-row-title">{cv.nome}</div>
-                              <div className="doc-row-meta">
+                              <div className="doc-row-title" title={cv.nome}>{cv.nome}</div>
+                              <div className="doc-row-meta" title={cv.arquivoNome}>
                                 {cv.arquivoNome} · {cv.origem} · recebido em {formatDate(cv.enviadoEm)}
                               </div>
                               <div style={{ marginTop: 4 }}>

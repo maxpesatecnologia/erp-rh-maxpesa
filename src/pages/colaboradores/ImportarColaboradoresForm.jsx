@@ -585,7 +585,7 @@ export default function ImportarColaboradoresForm({
 
       <label className="upload-drop" htmlFor="import-colaboradores-input">
         <UploadCloud size={22} />
-        <span>{arquivo ? arquivo.name : "Clique para selecionar um arquivo .csv, .xlsx ou .xls"}</span>
+        <span className="file-name" title={arquivo ? arquivo.name : undefined}>{arquivo ? arquivo.name : "Clique para selecionar um arquivo .csv, .xlsx ou .xls"}</span>
         <input
           id="import-colaboradores-input"
           type="file"

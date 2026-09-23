@@ -10,6 +10,7 @@ import { listarColaboradores, atualizarDocumentosColaborador } from "../../lib/c
 import { DOCUMENTOS_PESSOAIS_ADMISSAO, documentoEhMultiplo } from "../../lib/admissaoApi";
 import { anexarDocumentoChecklist, removerDocumentoChecklist } from "../../lib/documentosChecklistApi";
 import { formatFilial } from "../../utils/format";
+import { useAuth } from "../../context/AuthContext";
 
 // Mesma lista de documentos pessoais obrigatórios usada na Admissão Digital —
 // um colaborador que já chegou com eles anexados por lá não precisa reanexar
@@ -39,6 +40,7 @@ function gerarChaveDocumentoExtra(label, chavesExistentes) {
 }
 
 export default function Documentos() {
+  const { user } = useAuth();
   const [colaboradores, setColaboradores] = useState(isSupabaseConfigured ? [] : COLABORADORES);
   const [carregando, setCarregando] = useState(isSupabaseConfigured);
   const [erro, setErro] = useState("");
@@ -105,7 +107,7 @@ export default function Documentos() {
     setColaboradores((atual) => atual.map((c) => (c.id === colaborador.id ? { ...c, documentos } : c)));
     if (!isSupabaseConfigured) return;
     try {
-      await atualizarDocumentosColaborador(colaborador.id, documentos);
+      await atualizarDocumentosColaborador(colaborador.id, documentos, user, documentosAnterior);
     } catch (e) {
       setColaboradores((atual) =>
         atual.map((c) => (c.id === colaborador.id ? { ...c, documentos: documentosAnterior } : c))
@@ -310,6 +312,13 @@ export default function Documentos() {
           onCriarDocumento={(nome) => handleCriarDocumento(colaboradorDocumentos, nome)}
           onExcluirDocumento={(docChave) => handleExcluirDocumento(colaboradorDocumentos, docChave)}
           onFechar={() => setColaboradorDocumentosId(null)}
+          historico={{
+            nome: colaboradorDocumentos.atualizadoPor,
+            data: colaboradorDocumentos.atualizadoEm,
+            tabela: "rh_colaboradores",
+            registroId: colaboradorDocumentos.id,
+            titulo: colaboradorDocumentos.nome,
+          }}
         />
       )}
     </div>

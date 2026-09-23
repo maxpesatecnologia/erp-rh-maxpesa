@@ -585,6 +585,47 @@ input, select, textarea {
   background: var(--color-danger-bg);
 }
 
+/* Menu "⋮" de ações de linha (ex.: Desligar/Excluir em Cadastro de
+   Colaboradores) — renderizado via portal com position:fixed, por isso as
+   coordenadas vêm inline (top/right calculados a partir do botão) e só o
+   visual fica aqui. */
+.acoes-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 160px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.acoes-menu-item {
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.acoes-menu-item:hover {
+  background: var(--color-subtle);
+}
+
+.acoes-menu-item-danger {
+  color: var(--color-danger);
+}
+
+.acoes-menu-item-danger:hover {
+  background: var(--color-danger-bg);
+}
+
 /* ---------- Generic page bits ---------- */
 
 .page-header {
@@ -3105,6 +3146,22 @@ table.data-table tbody tr:hover {
 .doc-row-info {
   flex: 1;
   min-width: 0;
+}
+
+/* Truncamento padrão de nomes de arquivo/documento: uma linha com "…" ao
+   exceder a largura; o nome completo fica no atributo title. */
+.file-name,
+.doc-row-title,
+.doc-row-meta {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-name {
+  display: block;
 }
 
 .doc-row-title {
