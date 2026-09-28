@@ -73,17 +73,18 @@ export function AuthProvider({ children }) {
     if (error || !profile) {
       await supabase.auth.signOut();
       setUser(null);
-      return false;
+      return null;
     }
 
-    setUser({
+    const sessionUser = {
       id: authUser.id,
       email: authUser.email,
       nome: profile.nome,
       role: profile.role,
       filial: profile.filial ?? "—",
-    });
-    return true;
+    };
+    setUser(sessionUser);
+    return sessionUser;
   }
 
   async function signIn(email, password) {
@@ -94,7 +95,7 @@ export function AuthProvider({ children }) {
       if (!authorized) {
         throw new Error("Este e-mail ainda não foi liberado para acessar o sistema. Fale com o RH ou administrador.");
       }
-      return;
+      return authorized;
     }
 
     // Modo demo
@@ -111,6 +112,7 @@ export function AuthProvider({ children }) {
     };
     localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(sessionUser));
     setUser(sessionUser);
+    return sessionUser;
   }
 
   // Só faz sentido com Supabase real: em modo demo não há senha de verdade

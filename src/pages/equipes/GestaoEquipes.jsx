@@ -1,15 +1,7 @@
 import AvaliacaoEquipes from "./AvaliacaoEquipes";
 
+// O cabeçalho da página (título + "Gerar relatório") fica dentro de
+// AvaliacaoEquipes, que é quem tem os dados carregados.
 export default function GestaoEquipes() {
-  return (
-    <div>
-      <div className="page-header">
-        <div>
-          <h1>Gestão de Equipes</h1>
-        </div>
-      </div>
-
-      <AvaliacaoEquipes />
-    </div>
-  );
+  return <AvaliacaoEquipes />;
 }

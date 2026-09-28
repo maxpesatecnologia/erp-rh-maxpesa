@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Star, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { FileDown, Plus, Star, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import DataTable from "../../components/DataTable";
 import UltimaEdicaoBadge from "../../components/UltimaEdicaoBadge";
 import { useAuth } from "../../context/AuthContext";
@@ -10,6 +10,7 @@ import {
   listarAvaliacoesEquipe,
   criarAvaliacaoEquipe,
 } from "../../lib/avaliacaoEquipeApi";
+import { gerarRelatorioEquipesPdf } from "../../lib/relatorioEquipesPdf";
 
 const MESES_ABREV = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -93,6 +94,9 @@ export default function AvaliacaoEquipes() {
   const [salvando, setSalvando] = useState(false);
   const [erroForm, setErroForm] = useState("");
 
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
+  const [erroRelatorio, setErroRelatorio] = useState("");
+
   useEffect(() => {
     listarAvaliacoesEquipe()
       .then(setAvaliacoes)
@@ -144,6 +148,19 @@ export default function AvaliacaoEquipes() {
     }
   }
 
+  // Só libera o relatório quando pelo menos uma equipe já tem avaliação registrada.
+  async function handleGerarRelatorio() {
+    setGerandoRelatorio(true);
+    setErroRelatorio("");
+    try {
+      await gerarRelatorioEquipesPdf({ avaliacoes, geradoPor: user?.nome });
+    } catch (erro) {
+      setErroRelatorio(erro.message || "Erro ao gerar o relatório.");
+    } finally {
+      setGerandoRelatorio(false);
+    }
+  }
+
   const comparativo = EQUIPES.map((equipe) => {
     const historico = porEquipe.get(equipe) || [];
     const ultima = historico[0];
@@ -157,10 +174,26 @@ export default function AvaliacaoEquipes() {
 
   return (
     <div>
-      <div className="page-subtitle" style={{ marginBottom: 20 }}>
-        Cada gestor registra, por período, como está o próprio time. Fica salvo um histórico por equipe para
-        acompanhar a evolução e comparar a opinião entre times.
+      <div className="page-header">
+        <div>
+          <h1>Gestão de Equipes</h1>
+          <div className="page-subtitle">
+            Cada gestor registra, por período, como está o próprio time. Fica salvo um histórico por equipe para
+            acompanhar a evolução e comparar a opinião entre times.
+          </div>
+        </div>
+        <button
+          className="btn btn-outline"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          onClick={handleGerarRelatorio}
+          disabled={carregando || gerandoRelatorio || avaliacoes.length === 0}
+          title={avaliacoes.length === 0 ? "Disponível quando houver ao menos uma equipe avaliada" : undefined}
+        >
+          <FileDown size={16} /> {gerandoRelatorio ? "Gerando PDF…" : "Gerar relatório"}
+        </button>
       </div>
+
+      {erroRelatorio && <div className="login-error" style={{ marginBottom: 14 }}>{erroRelatorio}</div>}
 
       <div className="card card-pad" style={{ marginBottom: 20 }}>
         <div className="section-title">Comparativo entre equipes</div>

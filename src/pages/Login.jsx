@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { gsap } from "gsap";
 import { useAuth } from "../context/AuthContext";
 import { DEMO_USERS } from "../data/demoUsers";
+import { useWelcomeTransition, firstNameFrom } from "../components/WelcomeTransition";
 
 export default function Login() {
   const { signIn, requestPasswordReset, isSupabaseConfigured } = useAuth();
+  const { playWelcome } = useWelcomeTransition();
   const navigate = useNavigate();
+  const cardRef = useRef(null);
   const location = useLocation();
   const [mode, setMode] = useState("login"); // "login" | "forgot"
   const [email, setEmail] = useState("");
@@ -21,12 +25,18 @@ export default function Login() {
     setError("");
     setSubmitting(true);
     try {
-      await signIn(email, password);
+      const signedUser = await signIn(email, password);
       const redirectTo = location.state?.from?.pathname ?? "/";
-      navigate(redirectTo, { replace: true });
+      // O card sai de cena enquanto o overlay de boas-vindas entra; a navegação
+      // acontece por baixo do overlay, quando o texto termina de aparecer.
+      gsap.to(cardRef.current, {
+        opacity: 0, y: -10, scale: 0.98, filter: "blur(4px)", duration: 0.6, ease: "power2.inOut",
+      });
+      playWelcome(firstNameFrom(signedUser?.nome, signedUser?.email ?? email), () =>
+        navigate(redirectTo, { replace: true }),
+      );
     } catch (err) {
       setError(err.message);
-    } finally {
       setSubmitting(false);
     }
   }
@@ -59,7 +69,7 @@ export default function Login() {
 
   return (
     <div className="login-screen">
-      <div className="login-card">
+      <div className="login-card" ref={cardRef}>
         <div className="login-corner login-corner-tl" aria-hidden="true" />
         <div className="login-corner login-corner-br" aria-hidden="true" />
         <img className="login-watermark" src="/logo_png_maxpesa_fav.png" alt="" aria-hidden="true" />

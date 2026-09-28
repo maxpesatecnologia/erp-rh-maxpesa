@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { WelcomeTransitionProvider } from "./components/WelcomeTransition";
 
 import Login from "./pages/Login";
 import RedefinirSenha from "./pages/RedefinirSenha";
@@ -32,6 +33,7 @@ export default function App() {
     <ThemeProvider>
     <BrowserRouter>
       <AuthProvider>
+      <WelcomeTransitionProvider>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/redefinir-senha" element={<RedefinirSenha />} />
@@ -61,6 +63,7 @@ export default function App() {
             }
           />
         </Routes>
+      </WelcomeTransitionProvider>
       </AuthProvider>
     </BrowserRouter>
     </ThemeProvider>

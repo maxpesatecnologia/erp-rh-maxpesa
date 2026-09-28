@@ -22,18 +22,41 @@
         align-items: center;
         justify-content: center;
         background: #ffffff;
+        overflow: hidden;
         transition: opacity 0.35s ease;
       }
+      /* Fumaça vermelha em CSS puro (o JS ainda não carregou), no mesmo tom
+         do overlay de boas-vindas — o app assume com a versão em WebGL. */
+      #app-splash::before {
+        content: "";
+        position: absolute;
+        inset: -20%;
+        background:
+          radial-gradient(38% 32% at 18% 88%, rgba(226, 35, 26, 0.22), transparent 75%),
+          radial-gradient(34% 30% at 86% 92%, rgba(226, 35, 26, 0.2), transparent 75%),
+          radial-gradient(30% 26% at 30% 12%, rgba(247, 158, 153, 0.35), transparent 75%),
+          radial-gradient(28% 24% at 78% 10%, rgba(247, 158, 153, 0.3), transparent 75%);
+        filter: blur(50px);
+        animation: app-splash-drift 9s ease-in-out infinite alternate;
+      }
       #app-splash img {
+        position: relative;
         width: 100%;
         max-width: 220px;
         height: auto;
         object-fit: contain;
-        animation: app-splash-pulse 1.4s ease-in-out infinite;
+        animation: app-splash-pulse 2.2s ease-in-out infinite;
       }
       @keyframes app-splash-pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.55; }
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(0.985); }
+      }
+      @keyframes app-splash-drift {
+        from { transform: translate3d(-2%, 2%, 0) scale(1); }
+        to { transform: translate3d(2%, -2%, 0) scale(1.06); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-splash::before, #app-splash img { animation: none; }
       }
       #app-splash.app-splash-hidden {
         opacity: 0;

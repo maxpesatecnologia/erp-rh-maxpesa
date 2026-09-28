@@ -1,16 +1,19 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Moon, Sun, LogOut, KeyRound, Menu } from "lucide-react";
 import { ROLE_LABELS } from "../config/modules";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import TrocarSenhaModal from "./TrocarSenhaModal";
+import { useWelcomeTransition, firstNameFrom } from "./WelcomeTransition";
 import { formatFilial } from "../utils/format";
 
 export default function Topbar({ onMenuClick }) {
   const { user, signOut, isSupabaseConfigured } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { playGoodbye } = useWelcomeTransition();
   const navigate = useNavigate();
+  const loggingOut = useRef(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const initials = user?.nome
@@ -22,9 +25,15 @@ export default function Topbar({ onMenuClick }) {
         .toUpperCase()
     : "?";
 
-  async function handleLogout() {
-    await signOut();
-    navigate("/login");
+  // A sessão só é encerrada quando o "Até logo" já cobriu a tela, pra troca
+  // pro login acontecer por baixo do overlay.
+  function handleLogout() {
+    if (loggingOut.current) return;
+    loggingOut.current = true;
+    playGoodbye(firstNameFrom(user?.nome, user?.email), async () => {
+      await signOut();
+      navigate("/login", { replace: true });
+    });
   }
 
   return (

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import SmokeBackground from "./SmokeBackground";
 
 export default function Layout({ children }) {
   const location = useLocation();
@@ -30,6 +31,7 @@ export default function Layout({ children }) {
       <div className="app-main">
         <Topbar onMenuClick={() => setMenuAberto((v) => !v)} />
         <main className="app-content">
+          <SmokeBackground />
           <div className="page-deco" aria-hidden="true">
             <span className="page-deco-dots" />
             <span className="page-deco-bar" style={{ right: "34%" }} />

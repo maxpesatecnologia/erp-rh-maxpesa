@@ -254,9 +254,11 @@ input, select, textarea {
   background: linear-gradient(180deg, #ff3324 0%, #e2231a 55%, #b91710 100%);
 }
 
+/* Sem z-index de propósito: com ele o conteúdo vira um stacking context
+   abaixo da sidebar (z-index 20) e os modais (z-index 1000) ficam presos
+   atrás dela. Posicionado e depois do .page-deco no DOM, já fica por cima. */
 .page-transition {
   position: relative;
-  z-index: 1;
 }
 
 [data-theme="dark"] .page-deco {
@@ -1022,17 +1024,22 @@ table.data-table tbody tr:hover {
   background: #ffffff;
 }
 
+.app-loading-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* A "respiração" do logo é feita com GSAP (ver AppLoading.jsx). */
 .app-loading-logo {
+  position: relative;
   width: 100%;
   max-width: 220px;
   height: auto;
   object-fit: contain;
-  animation: app-loading-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes app-loading-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+  will-change: transform, opacity, filter;
 }
 
 /* ---------- Login page ---------- */
@@ -1661,6 +1668,19 @@ table.data-table tbody tr:hover {
   justify-content: center;
   padding: 20px;
   z-index: 1000;
+}
+
+/* Nas telas logadas o fundo escurece tudo, mas o card centraliza na área de
+   conteúdo, à direita da sidebar (aberta ou recolhida). Usa :has porque
+   vários modais são portados pro <body>, fora do .app-shell. */
+@media (min-width: 861px) {
+  body:has(.app-shell) .modal-backdrop {
+    padding-left: calc(var(--sidebar-width) + 20px);
+  }
+
+  body:has(.app-shell.sidebar-recolhida) .modal-backdrop {
+    padding-left: calc(var(--sidebar-width-collapsed) + 20px);
+  }
 }
 
 .modal-card {
@@ -3288,4 +3308,83 @@ table.data-table tbody tr:hover {
     flex: 1;
     padding: 8px 4px;
   }
+}
+
+/* ---------- Transição de boas-vindas (pós-login) ---------- */
+
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: #ffffff;
+  color: #1a1a1a;
+  opacity: 0;
+  pointer-events: all;
+}
+
+.welcome-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.welcome-canvas-fallback {
+  background: radial-gradient(ellipse at center, rgba(226, 35, 26, 0.22) 0%, rgba(255, 255, 255, 0) 60%), #ffffff;
+}
+
+.welcome-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  max-width: 100%;
+}
+
+.welcome-hello {
+  font-family: var(--font-heading);
+  font-size: clamp(40px, 7vw, 76px);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.welcome-line {
+  font-family: var(--font-sans);
+  font-size: clamp(17px, 2.4vw, 24px);
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  color: rgba(26, 26, 26, 0.68);
+}
+
+.welcome-word { display: inline-block; white-space: nowrap; }
+.welcome-char { display: inline-block; will-change: transform, opacity, filter; }
+
+.welcome-rule {
+  display: block;
+  width: 56px;
+  height: 2px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  transform-origin: center;
+}
+
+/* ---------- Fundo animado das telas logadas (fumaça em WebGL) ---------- */
+
+.app-smoke {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  display: block;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { CalendarClock, CheckCircle2, Circle, Clock, Plus, Trash2, X } from "lucide-react";
+import { CalendarClock, CheckCircle2, Circle, Clock, FileDown, Plus, Trash2, X } from "lucide-react";
 import DataTable from "../../components/DataTable";
 import StatusBadge from "../../components/StatusBadge";
 import Avatar from "../../components/Avatar";
@@ -22,6 +22,7 @@ import {
   conceitoDaNota,
   formatarNota,
 } from "../../lib/avaliacaoCalculo";
+import { gerarRelatorioDesempenhoPdf } from "../../lib/relatorioDesempenhoPdf";
 
 const OPCOES_STATUS_PDI = ["pendente", "em_andamento", "concluido"];
 
@@ -69,6 +70,9 @@ export default function AvaliacaoDesempenho() {
   const [excluindo, setExcluindo] = useState(false);
   const [erroExclusao, setErroExclusao] = useState("");
 
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
+  const [erroRelatorio, setErroRelatorio] = useState("");
+
   useEffect(() => {
     Promise.all([isSupabaseConfigured ? listarColaboradores() : Promise.resolve([]), listarAvaliacoes()])
       .then(([listaColaboradores, listaAvaliacoes]) => {
@@ -89,6 +93,23 @@ export default function AvaliacaoDesempenho() {
   const colaboradoresSemAvaliacao = colaboradores.filter(
     (c) => !avaliacoes.some((a) => a.colaboradorId === c.id && a.ciclo === CICLO_ATUAL)
   );
+
+  // O relatório cobre o ciclo atual e só lista quem já tem nota final fechada —
+  // por isso o botão só libera quando existe pelo menos um avaliado.
+  const avaliacoesDoCiclo = avaliacoesVisiveis.filter((a) => a.ciclo === CICLO_ATUAL);
+  const totalAvaliados = avaliacoesDoCiclo.filter((a) => calcularNotaFinal(a) != null).length;
+
+  async function handleGerarRelatorio() {
+    setGerandoRelatorio(true);
+    setErroRelatorio("");
+    try {
+      await gerarRelatorioDesempenhoPdf({ avaliacoes: avaliacoesDoCiclo, ciclo: CICLO_ATUAL, geradoPor: user?.nome });
+    } catch (erro) {
+      setErroRelatorio(erro.message || "Erro ao gerar o relatório.");
+    } finally {
+      setGerandoRelatorio(false);
+    }
+  }
 
   function podeEditarAuto() {
     return podeGerenciar;
@@ -225,20 +246,33 @@ export default function AvaliacaoDesempenho() {
           <h1>Avaliação de Desempenho</h1>
           <div className="page-subtitle">Metas, competências e plano de desenvolvimento individual (PDI) por colaborador</div>
         </div>
-        {podeGerenciar && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
-            className="btn btn-primary"
+            className="btn btn-outline"
             style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-            onClick={() => {
-              setErroIniciar("");
-              setIniciarAberto(true);
-            }}
-            disabled={colaboradoresSemAvaliacao.length === 0}
+            onClick={handleGerarRelatorio}
+            disabled={carregando || gerandoRelatorio || totalAvaliados === 0}
+            title={totalAvaliados === 0 ? "Disponível quando houver ao menos um colaborador com a avaliação concluída" : undefined}
           >
-            <Plus size={16} /> Iniciar avaliação
+            <FileDown size={16} /> {gerandoRelatorio ? "Gerando PDF…" : "Gerar relatório"}
           </button>
-        )}
+          {podeGerenciar && (
+            <button
+              className="btn btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              onClick={() => {
+                setErroIniciar("");
+                setIniciarAberto(true);
+              }}
+              disabled={colaboradoresSemAvaliacao.length === 0}
+            >
+              <Plus size={16} /> Iniciar avaliação
+            </button>
+          )}
+        </div>
       </div>
+
+      {erroRelatorio && <div className="login-error" style={{ marginBottom: 14 }}>{erroRelatorio}</div>}
 
       <div className="card card-pad" style={{ marginBottom: 20 }}>
         <div className="section-title">Como a nota é calculada (proposta para validação)</div>
